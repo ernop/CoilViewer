@@ -1,0 +1,8 @@
+Build CoilViewer with `dotnet build CoilViewer/CoilViewer.csproj -c Debug`; ensure `build.counter` exists and `CoilViewer/BuildVersionInfo.g.cs` stays untracked.
+
+After completing any set of edits, terminate all running `CoilViewer` instances and rebuild both Debug and Release configurations.
+
+Use ASCII quotes only; avoid smart quotes.
+
+Do not include emojis in any output.
+

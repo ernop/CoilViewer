@@ -1,0 +1,13 @@
+[
+  {
+    "key": "ctrl+shift+d",
+    "command": "workbench.action.tasks.runTask",
+    "args": "Build CoilViewer Debug"
+  },
+  {
+    "key": "ctrl+shift+r",
+    "command": "workbench.action.tasks.runTask",
+    "args": "Build CoilViewer Release"
+  }
+]
+

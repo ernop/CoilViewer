@@ -1,0 +1,120 @@
+Windows Registry Editor Version 5.00
+
+; CoilViewer image association script.
+; Update the CoilViewerExe path below to the absolute path to CoilViewer.exe before importing.
+; Importing requires signing out/in or restarting Explorer for changes to take effect.
+; Default path assumes a Release build from the repository root.
+
+[HKEY_CURRENT_USER\Software\Classes\.bmp]
+@="CoilViewer.Image"
+"Content Type"="image/bmp"
+
+[HKEY_CURRENT_USER\Software\Classes\.gif]
+@="CoilViewer.Image"
+"Content Type"="image/gif"
+
+[HKEY_CURRENT_USER\Software\Classes\.ico]
+@="CoilViewer.Image"
+"Content Type"="image/vnd.microsoft.icon"
+
+[HKEY_CURRENT_USER\Software\Classes\.jpg]
+@="CoilViewer.Image"
+"Content Type"="image/jpeg"
+
+[HKEY_CURRENT_USER\Software\Classes\.jpeg]
+@="CoilViewer.Image"
+"Content Type"="image/jpeg"
+
+[HKEY_CURRENT_USER\Software\Classes\.jfif]
+@="CoilViewer.Image"
+"Content Type"="image/jpeg"
+
+[HKEY_CURRENT_USER\Software\Classes\.png]
+@="CoilViewer.Image"
+"Content Type"="image/png"
+
+[HKEY_CURRENT_USER\Software\Classes\.tif]
+@="CoilViewer.Image"
+"Content Type"="image/tiff"
+
+[HKEY_CURRENT_USER\Software\Classes\.tiff]
+@="CoilViewer.Image"
+"Content Type"="image/tiff"
+
+[HKEY_CURRENT_USER\Software\Classes\.webp]
+@="CoilViewer.Image"
+"Content Type"="image/webp"
+
+[HKEY_CURRENT_USER\Software\Classes\.heic]
+@="CoilViewer.Image"
+"Content Type"="image/heic"
+
+[HKEY_CURRENT_USER\Software\Classes\.heif]
+@="CoilViewer.Image"
+"Content Type"="image/heif"
+
+[HKEY_CURRENT_USER\Software\Classes\.avif]
+@="CoilViewer.Image"
+"Content Type"="image/avif"
+
+[HKEY_CURRENT_USER\Software\Classes\CoilViewer.Image]
+@="CoilViewer Image"
+"FriendlyTypeName"="CoilViewer Image"
+
+[HKEY_CURRENT_USER\Software\Classes\CoilViewer.Image\DefaultIcon]
+@="\"C:\\proj\\coilui\\CoilViewer\\bin\\Release\\net8.0-windows\\CoilViewer.exe\",0"
+
+[HKEY_CURRENT_USER\Software\Classes\CoilViewer.Image\shell]
+@="open"
+
+[HKEY_CURRENT_USER\Software\Classes\CoilViewer.Image\shell\open]
+@="Open with CoilViewer"
+
+[HKEY_CURRENT_USER\Software\Classes\CoilViewer.Image\shell\open\command]
+@="\"C:\\proj\\coilui\\CoilViewer\\bin\\Release\\net8.0-windows\\CoilViewer.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\Applications\CoilViewer.exe]
+"FriendlyAppName"="CoilViewer"
+
+[HKEY_CURRENT_USER\Software\Classes\Applications\CoilViewer.exe\shell\open\command]
+@="\"C:\\proj\\coilui\\CoilViewer\\bin\\Release\\net8.0-windows\\CoilViewer.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.bmp]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.gif]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.ico]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.jpg]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.jpeg]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.jfif]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.png]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.tif]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.tiff]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.webp]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.heic]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.heif]
+"Application"="CoilViewer.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.avif]
+"Application"="CoilViewer.exe"
+

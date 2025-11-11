@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build CoilViewer Debug",
+      "type": "shell",
+      "command": "dotnet build CoilViewer/CoilViewer.csproj -c Debug",
+      "group": "build",
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Build CoilViewer Release",
+      "type": "shell",
+      "command": "dotnet build CoilViewer/CoilViewer.csproj -c Release",
+      "group": "build",
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}
+

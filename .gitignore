@@ -1,0 +1,29 @@
+build.counter
+
+# Build outputs
+bin/
+obj/
+TestResults/
+
+# IDE and tooling
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Logs and diagnostics
+*.log
+*.dmp
+*.etl
+
+# Generated artifacts
+CoilViewer/Generated/
+
+# Local settings
+*.psess
+*.vsp
+*.vspx
+
+

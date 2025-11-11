@@ -1,0 +1,320 @@
+﻿<Window x:Class="CoilViewer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CoilViewer"
+        mc:Ignorable="d"
+        Title="{x:Static local:BuildVersion.WindowTitle}"
+        WindowStartupLocation="CenterScreen"
+        PreviewKeyDown="OnKeyDown"
+        PreviewKeyUp="OnKeyUp"
+        MouseWheel="OnMouseWheel"
+        MouseLeftButtonDown="OnMouseLeftButtonDown"
+        WindowState="Maximized"
+        Background="Black"
+        AllowDrop="True"
+        Drop="OnDrop"
+        PreviewDragOver="OnPreviewDragOver">
+    <Window.Resources>
+        <LinearGradientBrush x:Key="ShortcutOverlayBackground"
+                             StartPoint="0,0"
+                             EndPoint="0,1">
+            <GradientStop Color="#FF252533"
+                          Offset="0" />
+            <GradientStop Color="#FF171722"
+                          Offset="1" />
+        </LinearGradientBrush>
+        <Style x:Key="ShortcutCardStyle"
+               TargetType="Border">
+            <Setter Property="Padding"
+                    Value="12,10" />
+            <Setter Property="Margin"
+                    Value="0,0,12,12" />
+            <Setter Property="CornerRadius"
+                    Value="8" />
+            <Setter Property="Background"
+                    Value="#26FFFFFF" />
+        </Style>
+        <Style x:Key="ShortcutKeyStyle"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="14" />
+            <Setter Property="FontWeight"
+                    Value="SemiBold" />
+            <Setter Property="Foreground"
+                    Value="White" />
+            <Setter Property="Opacity"
+                    Value="0.95" />
+            <Setter Property="TextWrapping"
+                    Value="Wrap" />
+        </Style>
+        <Style x:Key="ShortcutDescriptionStyle"
+               TargetType="TextBlock">
+            <Setter Property="Margin"
+                    Value="0,4,0,0" />
+            <Setter Property="Foreground"
+                    Value="#CCFFFFFF" />
+            <Setter Property="FontSize"
+                    Value="12" />
+            <Setter Property="TextWrapping"
+                    Value="Wrap" />
+        </Style>
+    </Window.Resources>
+    <Window.ContextMenu>
+        <ContextMenu x:Name="MainContextMenu" Opened="OnContextMenuOpened">
+            <MenuItem x:Name="MenuCopyFullPathMenuItem"
+                      Header="Copy full path"
+                      Click="OnCopyFullPathClick" />
+            <MenuItem x:Name="MenuInfoCurrentItem"
+                      IsEnabled="False"
+                      Header="Image: --/--" />
+            <MenuItem x:Name="MenuInfoSort"
+                      IsEnabled="False"
+                      Header="Sort: File name ASC" />
+            <Separator />
+            <MenuItem x:Name="SortFileNameAscMenuItem"
+                      Header="File name ↑"
+                      IsCheckable="True"
+                      Click="OnSortOptionClick"
+                      Tag="FileName|Ascending" />
+            <MenuItem x:Name="SortFileNameDescMenuItem"
+                      Header="File name ↓"
+                      IsCheckable="True"
+                      Click="OnSortOptionClick"
+                      Tag="FileName|Descending" />
+            <MenuItem x:Name="SortCreationAscMenuItem"
+                      Header="Date created ↑"
+                      IsCheckable="True"
+                      Click="OnSortOptionClick"
+                      Tag="CreationTime|Ascending" />
+            <MenuItem x:Name="SortCreationDescMenuItem"
+                      Header="Date created ↓"
+                      IsCheckable="True"
+                      Click="OnSortOptionClick"
+                      Tag="CreationTime|Descending" />
+            <MenuItem x:Name="SortModifiedAscMenuItem"
+                      Header="Date modified ↑"
+                      IsCheckable="True"
+                      Click="OnSortOptionClick"
+                      Tag="LastWriteTime|Ascending" />
+            <MenuItem x:Name="SortModifiedDescMenuItem"
+                      Header="Date modified ↓"
+                      IsCheckable="True"
+                      Click="OnSortOptionClick"
+                      Tag="LastWriteTime|Descending" />
+            <MenuItem x:Name="SortSizeAscMenuItem"
+                      Header="File size ↑"
+                      IsCheckable="True"
+                      Click="OnSortOptionClick"
+                      Tag="FileSize|Ascending" />
+            <MenuItem x:Name="SortSizeDescMenuItem"
+                      Header="File size ↓"
+                      IsCheckable="True"
+                      Click="OnSortOptionClick"
+                      Tag="FileSize|Descending" />
+        </ContextMenu>
+    </Window.ContextMenu>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border x:Name="Backdrop"
+                Background="Black" />
+
+        <ScrollViewer x:Name="ImageScrollViewer"
+                      Background="Transparent"
+                      HorizontalContentAlignment="Center"
+                      VerticalContentAlignment="Center"
+                      HorizontalScrollBarVisibility="Hidden"
+                      VerticalScrollBarVisibility="Hidden"
+                      SizeChanged="OnImageScrollViewerSizeChanged"
+                      PreviewMouseLeftButtonDown="OnImageMouseLeftButtonDown"
+                      PreviewMouseLeftButtonUp="OnImageMouseLeftButtonUp"
+                      PreviewMouseMove="OnImageMouseMove"
+                      Focusable="False">
+            <Grid>
+                <Image x:Name="ImageDisplay"
+                       Stretch="Uniform"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       RenderOptions.EdgeMode="Aliased"
+                       SnapsToDevicePixels="True"
+                       RenderTransformOrigin="0.5,0.5">
+                    <Image.LayoutTransform>
+                        <ScaleTransform x:Name="ImageFitTransform" ScaleX="1" ScaleY="1" />
+                    </Image.LayoutTransform>
+                    <Image.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="ImageZoomTransform" ScaleX="1" ScaleY="1" />
+                            <TranslateTransform x:Name="ImagePanTransform" X="0" Y="0" />
+                        </TransformGroup>
+                    </Image.RenderTransform>
+                </Image>
+            </Grid>
+        </ScrollViewer>
+
+        <Border x:Name="Overlay"
+                Background="#66000000"
+                CornerRadius="4"
+                Padding="12"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                Margin="16"
+                Visibility="Collapsed"
+                Opacity="0">
+            <StackPanel>
+                <TextBlock x:Name="OverlayTitle"
+                           Foreground="White"
+                           FontSize="18"
+                           FontWeight="Bold" />
+                <TextBlock x:Name="OverlayDetails"
+                           Foreground="White"
+                           FontSize="14"
+                           Opacity="0.8" />
+                <TextBlock x:Name="OverlaySort"
+                           Foreground="White"
+                           FontSize="14"
+                           Opacity="0.8"
+                           Visibility="Collapsed" />
+            </StackPanel>
+        </Border>
+
+        <Border x:Name="ShortcutsOverlay"
+                CornerRadius="12"
+                Padding="28"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Visibility="Collapsed"
+                Opacity="0">
+            <Border.Background>
+                <StaticResource ResourceKey="ShortcutOverlayBackground" />
+            </Border.Background>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="24"
+                                  ShadowDepth="0"
+                                  Opacity="0.6" />
+            </Border.Effect>
+            <StackPanel>
+                <StackPanel Margin="0,0,0,20">
+                    <TextBlock Text="Keyboard Shortcuts"
+                               Foreground="White"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Opacity="0.95"
+                               Margin="0,0,0,4" />
+                    <TextBlock Text="Stay in flow with these quick commands."
+                               Foreground="#CCFFFFFF"
+                               FontSize="13" />
+                </StackPanel>
+                <UniformGrid Columns="2">
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="Space / Right / Down"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Next image"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="Backspace / Left / Up"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Previous image"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="Home / End"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Jump to first or last"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="= / -"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Zoom in or out"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="&#92;"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Reset zoom"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="Arrow keys (zoomed)"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Pan image"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="Mouse wheel (zoomed)"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Scroll image"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="F11 / Double-click"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Toggle fullscreen"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="I"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Toggle metadata overlay"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="/ or ?"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Toggle this list"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+                <TextBlock Text="Press Esc to close."
+                           Foreground="#99FFFFFF"
+                           FontSize="12"
+                           Margin="0,12,0,0"
+                           HorizontalAlignment="Right" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock x:Name="MessageBlock"
+                   Text="Loading..."
+                   Foreground="White"
+                   FontSize="24"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Visibility="Collapsed" />
+
+        <Border x:Name="StatusBar"
+                Grid.Row="1"
+                Background="#44000000"
+                Padding="12,6"
+                Visibility="Collapsed">
+            <TextBlock x:Name="StatusText"
+                       Foreground="White"
+                       FontSize="13"
+                       Opacity="0.9" />
+        </Border>
+    </Grid>
+</Window>
