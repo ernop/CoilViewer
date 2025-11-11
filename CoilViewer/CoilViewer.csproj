@@ -9,6 +9,7 @@
     <BuildCounterFile>$(MSBuildThisFileDirectory)build.counter</BuildCounterFile>
     <GeneratedVersionOutputDir>$(MSBuildThisFileDirectory)Generated\</GeneratedVersionOutputDir>
     <GeneratedVersionFile>$(GeneratedVersionOutputDir)BuildVersionInfo.g.cs</GeneratedVersionFile>
+    <ApplicationIcon>Assets\CoilViewer.ico</ApplicationIcon>
   </PropertyGroup>
 
   <Target Name="IncrementBuildCounter" BeforeTargets="CoreCompile">
@@ -73,4 +74,19 @@
     <Message Importance="High" Text="CoilViewer Build: $(BuildVersionString)" />
   </Target>
 
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\CoilViewer_256.png" />
+    <Resource Include="Assets\CoilViewer_128.png" />
+    <Resource Include="Assets\CoilViewer_64.png" />
+    <Resource Include="Assets\CoilViewer_48.png" />
+    <Resource Include="Assets\CoilViewer_32.png" />
+    <Resource Include="Assets\CoilViewer_16.png" />
+    <Content Include="Assets\CoilViewer.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

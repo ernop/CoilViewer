@@ -9,7 +9,7 @@
         WindowStartupLocation="CenterScreen"
         PreviewKeyDown="OnKeyDown"
         PreviewKeyUp="OnKeyUp"
-        MouseWheel="OnMouseWheel"
+        PreviewMouseWheel="OnMouseWheel"
         MouseLeftButtonDown="OnMouseLeftButtonDown"
         WindowState="Maximized"
         Background="Black"
@@ -204,7 +204,7 @@
                                FontWeight="Bold"
                                Opacity="0.95"
                                Margin="0,0,0,4" />
-                    <TextBlock Text="Stay in flow with these quick commands."
+                    <TextBlock Text="Stay in flow with these quick commands, including one-touch archiving."
                                Foreground="#CCFFFFFF"
                                FontSize="13" />
                 </StackPanel>
@@ -259,9 +259,17 @@
                     </Border>
                     <Border Style="{StaticResource ShortcutCardStyle}">
                         <StackPanel>
-                            <TextBlock Text="Mouse wheel (zoomed)"
+                            <TextBlock Text="Ctrl+Shift+Arrow keys"
                                        Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Scroll image"
+                            <TextBlock Text="Jump halfway through the list"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="Mouse wheel"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Previous / next image"
                                        Style="{StaticResource ShortcutDescriptionStyle}" />
                         </StackPanel>
                     </Border>
@@ -270,6 +278,22 @@
                             <TextBlock Text="F11 / Double-click"
                                        Style="{StaticResource ShortcutKeyStyle}" />
                             <TextBlock Text="Toggle fullscreen"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="A"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Archive to old folder"
+                                       Style="{StaticResource ShortcutDescriptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ShortcutCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="Ctrl+Z or U"
+                                       Style="{StaticResource ShortcutKeyStyle}" />
+                            <TextBlock Text="Undo last archive"
                                        Style="{StaticResource ShortcutDescriptionStyle}" />
                         </StackPanel>
                     </Border>
@@ -290,6 +314,11 @@
                         </StackPanel>
                     </Border>
                 </UniformGrid>
+                <TextBlock Text="Press A to move the current file into an automatically managed 'old' folder without overwriting existing archives."
+                           Foreground="#CCFFFFFF"
+                           FontSize="13"
+                           TextWrapping="Wrap"
+                           Margin="0,16,0,0" />
                 <TextBlock Text="Press Esc to close."
                            Foreground="#99FFFFFF"
                            FontSize="12"

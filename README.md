@@ -45,8 +45,8 @@ A `config.json` file is created next to the executable on first launch:
 
 ```json
 {
-  "PreloadRadius": 4,
-  "MaxCachedImages": 9,
+  "PreloadRadius": 10,
+  "MaxCachedImages": 21,
   "BackgroundColor": "#000000",
   "FitMode": "Uniform",
   "ScalingMode": "HighQuality",

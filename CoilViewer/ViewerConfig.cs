@@ -58,8 +58,8 @@ internal sealed class ViewerConfig
 
     public static ViewerConfig CreateDefault() => new()
     {
-        PreloadRadius = 4,
-        MaxCachedImages = 9,
+        PreloadRadius = 10,
+        MaxCachedImages = 21,
         BackgroundColor = "#000000",
         FitMode = "Uniform",
         ScalingMode = "HighQuality",

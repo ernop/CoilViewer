@@ -20,10 +20,13 @@
 - "\" resets zoom to the fitted scale without disturbing navigation.
 - When zoomed, the arrow keys and mouse wheel pan the image smoothly.
 - When not zoomed, the mouse wheel navigates to the previous or next image.
+- The shortcuts overlay highlights the "A" key for automatically archiving the current image into the "old" folder.
 - Mouse drag pans the zoomed image while leaving image navigation unchanged.
 - Pressing "A" moves the current image into an "old" subfolder, auto-renaming to avoid collisions, and keeps browsing smooth.
 - Launch and error details are written to `coilviewer-launch.log` and `coilviewer-errors.log` near the project root.
 - Never use fancy quotes; use ASCII quotes only.
 - Never use emojis in any output.
+
+- Ctrl+Shift+Arrow keys jump halfway toward the start or end of the image list for rapid exploration.
 
 

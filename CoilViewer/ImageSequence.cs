@@ -186,6 +186,44 @@ internal sealed class ImageSequence
         return true;
     }
 
+    public bool JumpHalfTowardsEnd()
+    {
+        if (_images.Count == 0)
+        {
+            return false;
+        }
+
+        var remaining = (_images.Count - 1) - CurrentIndex;
+        if (remaining <= 0)
+        {
+            return false;
+        }
+
+        var step = (int)Math.Ceiling(remaining / 2.0);
+        step = Math.Max(step, 1);
+        CurrentIndex = Math.Min(CurrentIndex + step, _images.Count - 1);
+        return true;
+    }
+
+    public bool JumpHalfTowardsStart()
+    {
+        if (_images.Count == 0)
+        {
+            return false;
+        }
+
+        var remaining = CurrentIndex;
+        if (remaining <= 0)
+        {
+            return false;
+        }
+
+        var step = (int)Math.Ceiling(remaining / 2.0);
+        step = Math.Max(step, 1);
+        CurrentIndex = Math.Max(CurrentIndex - step, 0);
+        return true;
+    }
+
     private static bool IsSupportedExtension(string extension)
     {
         return SupportedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);

@@ -62,7 +62,7 @@ Windows Registry Editor Version 5.00
 "FriendlyTypeName"="CoilViewer Image"
 
 [HKEY_CURRENT_USER\Software\Classes\CoilViewer.Image\DefaultIcon]
-@="\"C:\\proj\\coilui\\CoilViewer\\bin\\Release\\net8.0-windows\\CoilViewer.exe\",0"
+@="\"D:\\\\proj\\\\CoilViewer\\\\CoilViewer\\\\bin\\\\Release\\\\net8.0-windows\\\\CoilViewer.exe\",0"
 
 [HKEY_CURRENT_USER\Software\Classes\CoilViewer.Image\shell]
 @="open"
@@ -71,13 +71,13 @@ Windows Registry Editor Version 5.00
 @="Open with CoilViewer"
 
 [HKEY_CURRENT_USER\Software\Classes\CoilViewer.Image\shell\open\command]
-@="\"C:\\proj\\coilui\\CoilViewer\\bin\\Release\\net8.0-windows\\CoilViewer.exe\" \"%1\""
+@="\"D:\\\\proj\\\\CoilViewer\\\\CoilViewer\\\\bin\\\\Release\\\\net8.0-windows\\\\CoilViewer.exe\" \"%1\""
 
 [HKEY_CURRENT_USER\Software\Classes\Applications\CoilViewer.exe]
 "FriendlyAppName"="CoilViewer"
 
 [HKEY_CURRENT_USER\Software\Classes\Applications\CoilViewer.exe\shell\open\command]
-@="\"C:\\proj\\coilui\\CoilViewer\\bin\\Release\\net8.0-windows\\CoilViewer.exe\" \"%1\""
+@="\"D:\\\\proj\\\\CoilViewer\\\\CoilViewer\\\\bin\\\\Release\\\\net8.0-windows\\\\CoilViewer.exe\" \"%1\""
 
 [HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.bmp]
 "Application"="CoilViewer.exe"

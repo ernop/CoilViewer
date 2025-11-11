@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -10,8 +13,11 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Drawing.Imaging;
 using Microsoft.Win32;
 
+using Point = System.Windows.Point;
+using Vector = System.Windows.Vector;
 namespace CoilViewer;
 
 /// <summary>
@@ -30,6 +36,9 @@ public partial class MainWindow : Window
     private const double PanSmoothTapDistance = 36.0;
     private const double PanSmoothEpsilon = 0.05;
 
+    private const string PngDataFormat = "PNG";
+    private const int ClipboardRetryCount = 5;
+    private static readonly TimeSpan ClipboardRetryDelay = TimeSpan.FromMilliseconds(120);
     private ViewerConfig _config;
     private readonly string _configPath;
     private readonly ImageSequence _sequence = new();
@@ -49,8 +58,10 @@ public partial class MainWindow : Window
     private Vector _smoothPanVelocity;
     private bool _isSmoothPanAnimating;
     private TimeSpan _smoothPanLastTick = TimeSpan.Zero;
+    private readonly Stack<ArchiveStep> _archiveHistory = new();
     private readonly DispatcherTimer _statusTimer;
     private static readonly TimeSpan StatusDisplayDuration = TimeSpan.FromSeconds(2.5);
+    private readonly record struct ArchiveAction(string OriginalPath, string ArchivedPath);
 
     internal MainWindow(ViewerConfig config, string configPath, string? initialPath, DirectoryInstanceGuard? initialGuard)
     {
@@ -326,6 +337,7 @@ public partial class MainWindow : Window
             }
 
             File.Move(currentPath, targetPath);
+            _archiveHistory.Push(new ArchiveStep(currentPath, targetPath));
             Logger.Log($"Moved image '{currentPath}' to '{targetPath}'");
 
             if (_sequence.RemoveCurrent())
@@ -334,7 +346,8 @@ public partial class MainWindow : Window
                 ResetZoom();
                 UpdateContextMenu();
                 await DisplayCurrentAsync();
-                ShowMessage($"Moved to '{targetPath}'.");
+                HideMessage();
+                ShowStatus($"Moved to '{targetPath}'.");
             }
             else
             {
@@ -350,7 +363,8 @@ public partial class MainWindow : Window
                 ImageFitTransform.ScaleX = _fitScale;
                 ImageFitTransform.ScaleY = _fitScale;
                 SetZoom(_fitScale);
-                ShowMessage($"Moved to '{targetPath}'. No images remain.");
+                ShowStatus($"Moved to '{targetPath}'.");
+                ShowMessage("No images remain.");
                 UpdateWindowTitle();
             }
         }
@@ -358,6 +372,53 @@ public partial class MainWindow : Window
         {
             Logger.LogError($"Failed to move image '{currentPath}'", ex);
             ShowMessage($"Failed to move image: {ex.Message}");
+        }
+    }
+
+    private void UndoLastArchive()
+    {
+        if (_archiveHistory.Count == 0)
+        {
+            ShowStatus("Nothing to undo.");
+            return;
+        }
+
+        var action = _archiveHistory.Pop();
+
+        try
+        {
+            if (!File.Exists(action.ArchivedPath))
+            {
+                ShowStatus($"Cannot undo: '{action.ArchivedPath}' is missing.");
+                return;
+            }
+
+            var destinationDirectory = Path.GetDirectoryName(action.OriginalPath);
+            if (string.IsNullOrEmpty(destinationDirectory))
+            {
+                ShowStatus("Cannot undo: destination is invalid.");
+                return;
+            }
+
+            Directory.CreateDirectory(destinationDirectory);
+
+            if (File.Exists(action.OriginalPath))
+            {
+                ShowStatus($"Cannot undo: '{action.OriginalPath}' already exists.");
+                _archiveHistory.Push(action);
+                return;
+            }
+
+            File.Move(action.ArchivedPath, action.OriginalPath);
+            Logger.Log($"Restored image '{action.OriginalPath}' from '{action.ArchivedPath}'");
+            LoadSequence(action.OriginalPath, action.OriginalPath);
+            ShowStatus($"Restored to '{action.OriginalPath}'.");
+        }
+        catch (Exception ex)
+        {
+            _archiveHistory.Push(action);
+            Logger.LogError($"Failed to undo archive for '{action.OriginalPath}' from '{action.ArchivedPath}'", ex);
+            ShowStatus("Failed to undo archive.");
         }
     }
 
@@ -432,6 +493,39 @@ public partial class MainWindow : Window
             return;
         }
 
+        if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            switch (e.Key)
+            {
+                case Key.Right:
+                case Key.Down:
+                {
+                    var previousIndex = _sequence.CurrentIndex;
+                    if (_sequence.JumpHalfTowardsEnd())
+                    {
+                        Logger.Log($"Quadratic move forward: key={e.Key}, from={previousIndex}, to={_sequence.CurrentIndex}, total={_sequence.Count}");
+                        _ = DisplayCurrentAsync();
+                    }
+
+                    e.Handled = true;
+                    return;
+                }
+                case Key.Left:
+                case Key.Up:
+                {
+                    var previousIndex = _sequence.CurrentIndex;
+                    if (_sequence.JumpHalfTowardsStart())
+                    {
+                        Logger.Log($"Quadratic move backward: key={e.Key}, from={previousIndex}, to={_sequence.CurrentIndex}, total={_sequence.Count}");
+                        _ = DisplayCurrentAsync();
+                    }
+
+                    e.Handled = true;
+                    return;
+                }
+            }
+        }
+
         switch (e.Key)
         {
             case Key.Right:
@@ -499,6 +593,14 @@ public partial class MainWindow : Window
                 _ = MoveCurrentImageToOldAsync();
                 e.Handled = true;
                 break;
+            case Key.Z when Keyboard.Modifiers == ModifierKeys.Control:
+                UndoLastArchive();
+                e.Handled = true;
+                break;
+            case Key.U when Keyboard.Modifiers == ModifierKeys.None:
+                UndoLastArchive();
+                e.Handled = true;
+                break;
             case Key.C when Keyboard.Modifiers.HasFlag(ModifierKeys.Control):
                 CopyCurrentImageToClipboard();
                 e.Handled = true;
@@ -555,9 +657,9 @@ public partial class MainWindow : Window
 
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (IsZoomed())
+        if (e.Delta > 0)
         {
-            Pan(0, -e.Delta * PanWheelFactor);
+            MovePrevious();
             e.Handled = true;
             return;
         }
@@ -565,10 +667,7 @@ public partial class MainWindow : Window
         if (e.Delta < 0)
         {
             MoveNext();
-        }
-        else if (e.Delta > 0)
-        {
-            MovePrevious();
+            e.Handled = true;
         }
     }
 
@@ -835,25 +934,236 @@ public partial class MainWindow : Window
             return;
         }
 
+        var currentPath = _sequence.CurrentPath;
+        Logger.Log($"Clipboard copy requested for '{currentPath}'.");
+
         try
         {
-            BitmapSource source = _currentBitmap;
-            if (!source.IsFrozen)
-            {
-                source = BitmapFrame.Create(source);
-                if (source.CanFreeze)
-                {
-                    source.Freeze();
-                }
-            }
+            var source = GetFrozenBitmapSource(_currentBitmap);
+            using var package = CreateClipboardPackage(source, currentPath);
 
-            Clipboard.SetImage(source);
-            ShowStatus("Image copied to clipboard.");
+            if (TrySetClipboard(package.DataObject, out var error))
+            {
+                Logger.Log($"Clipboard copy succeeded for '{currentPath}'.");
+                ShowStatus("Image copied to clipboard.");
+            }
+            else
+            {
+                var message = $"Failed to copy image to clipboard after {ClipboardRetryCount} attempts.";
+                if (error != null)
+                {
+                    Logger.LogError($"{message} Path='{currentPath}'.", error);
+                }
+                ShowStatus("Failed to copy image.");
+            }
         }
         catch (Exception ex)
         {
             Logger.LogError("Failed to copy image to clipboard.", ex);
             ShowStatus("Failed to copy image.");
+        }
+    }
+
+    private static BitmapSource GetFrozenBitmapSource(BitmapSource source)
+    {
+        if (source.IsFrozen && (source.Dispatcher == null || source.Dispatcher.CheckAccess()))
+        {
+            return source;
+        }
+
+        var dispatcher = source.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            return dispatcher.Invoke(() => CloneFrozen(source));
+        }
+
+        return CloneFrozen(source);
+    }
+
+    private static BitmapSource CloneFrozen(BitmapSource source)
+    {
+        var clone = new WriteableBitmap(source);
+
+        if (!clone.IsFrozen && clone.CanFreeze)
+        {
+            clone.Freeze();
+        }
+
+        return clone;
+    }
+
+    private static ClipboardPackage CreateClipboardPackage(BitmapSource source, string? filePath)
+    {
+        var dataObject = new DataObject();
+        dataObject.SetImage(source);
+
+        var disposables = new List<IDisposable>();
+
+        var gdiBitmap = CreateGdiBitmap(source);
+        dataObject.SetData(DataFormats.Bitmap, gdiBitmap, autoConvert: true);
+        disposables.Add(gdiBitmap);
+
+        var dibStream = EncodeToDeviceIndependentBitmap(source);
+        if (dibStream != null)
+        {
+            dataObject.SetData(DataFormats.Dib, dibStream, autoConvert: false);
+            disposables.Add(dibStream);
+        }
+
+        var pngStream = EncodeToPng(source);
+        if (pngStream != null)
+        {
+            dataObject.SetData(PngDataFormat, pngStream, autoConvert: false);
+            disposables.Add(pngStream);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+        {
+            var files = new StringCollection { filePath };
+            dataObject.SetFileDropList(files);
+        }
+
+        return new ClipboardPackage(dataObject, disposables);
+    }
+
+    private static System.Drawing.Bitmap CreateGdiBitmap(BitmapSource source)
+    {
+        var bitmap = new System.Drawing.Bitmap(source.PixelWidth, source.PixelHeight, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+        var bounds = new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height);
+        var data = bitmap.LockBits(bounds, ImageLockMode.WriteOnly, bitmap.PixelFormat);
+
+        try
+        {
+            source.CopyPixels(Int32Rect.Empty, data.Scan0, data.Height * data.Stride, data.Stride);
+        }
+        finally
+        {
+            bitmap.UnlockBits(data);
+        }
+
+        return bitmap;
+    }
+
+    private static MemoryStream? EncodeToDeviceIndependentBitmap(BitmapSource source)
+    {
+        var independentBitmap = CreateIndependentBitmap(source);
+        if (independentBitmap == null)
+        {
+            return null;
+        }
+
+        var encoder = new BmpBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(independentBitmap));
+
+        using var stream = new MemoryStream();
+        encoder.Save(stream);
+        var bytes = stream.ToArray();
+
+        const int bitmapFileHeaderSize = 14;
+        if (bytes.Length <= bitmapFileHeaderSize)
+        {
+            return null;
+        }
+
+        var dibBytes = new byte[bytes.Length - bitmapFileHeaderSize];
+        Buffer.BlockCopy(bytes, bitmapFileHeaderSize, dibBytes, 0, dibBytes.Length);
+        return new MemoryStream(dibBytes, writable: false);
+    }
+
+    private static MemoryStream? EncodeToPng(BitmapSource source)
+    {
+        var independentBitmap = CreateIndependentBitmap(source);
+        if (independentBitmap == null)
+        {
+            return null;
+        }
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(independentBitmap));
+
+        var stream = new MemoryStream();
+        encoder.Save(stream);
+        stream.Position = 0;
+        return stream;
+    }
+
+    private static BitmapSource? CreateIndependentBitmap(BitmapSource source)
+    {
+        try
+        {
+            var pixelFormat = source.Format;
+            var width = source.PixelWidth;
+            var height = source.PixelHeight;
+            var stride = (width * pixelFormat.BitsPerPixel + 7) / 8;
+            var pixels = new byte[height * stride];
+
+            source.CopyPixels(pixels, stride, 0);
+
+            var bitmap = new WriteableBitmap(width, height, source.DpiX, source.DpiY, pixelFormat, null);
+            bitmap.WritePixels(new Int32Rect(0, 0, width, height), pixels, stride, 0);
+            bitmap.Freeze();
+
+            return bitmap;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Failed to create independent bitmap for encoding.", ex);
+            return null;
+        }
+    }
+
+    private static bool TrySetClipboard(DataObject dataObject, out Exception? error)
+    {
+        error = null;
+
+        for (int attempt = 1; attempt <= ClipboardRetryCount; attempt++)
+        {
+            try
+            {
+                Clipboard.SetDataObject(dataObject, true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+
+                if (attempt == ClipboardRetryCount)
+                {
+                    break;
+                }
+
+                Thread.Sleep(ClipboardRetryDelay);
+            }
+        }
+
+        return false;
+    }
+
+    private sealed class ClipboardPackage : IDisposable
+    {
+        public ClipboardPackage(DataObject dataObject, IEnumerable<IDisposable> resources)
+        {
+            DataObject = dataObject;
+            _resources = new List<IDisposable>(resources.Where(r => r != null));
+        }
+
+        public DataObject DataObject { get; }
+
+        private readonly List<IDisposable> _resources;
+
+        public void Dispose()
+        {
+            foreach (var resource in _resources)
+            {
+                try
+                {
+                    resource.Dispose();
+                }
+                catch
+                {
+                    // ignore disposal errors
+                }
+            }
         }
     }
 
@@ -1386,6 +1696,18 @@ public partial class MainWindow : Window
         if (_currentBitmap != null)
         {
             UpdateFitScale(_currentBitmap, forceReset: !IsZoomed());
+        }
+    }
+
+    private readonly struct ArchiveStep
+    {
+        internal string OriginalPath { get; }
+        internal string ArchivedPath { get; }
+
+        internal ArchiveStep(string originalPath, string archivedPath)
+        {
+            OriginalPath = originalPath;
+            ArchivedPath = archivedPath;
         }
     }
 }
