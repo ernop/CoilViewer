@@ -39,16 +39,25 @@ internal sealed class DirectoryInstanceGuard : IDisposable
 
         try
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var mutex = new Mutex(initiallyOwned: true, name: BuildMutexName(directory), out var createdNew);
+            var mutexTime = sw.ElapsedMilliseconds;
+            
             if (!createdNew)
             {
                 mutex.Dispose();
                 return false;
             }
 
+            sw.Restart();
             var activationEvent = new EventWaitHandle(false, EventResetMode.AutoReset, BuildEventName(directory));
+            var eventTime = sw.ElapsedMilliseconds;
+            
+            sw.Restart();
             guard = new DirectoryInstanceGuard(directory, mutex, activationEvent);
-            Logger.Log($"Acquired directory guard for '{directory}'.");
+            var guardTime = sw.ElapsedMilliseconds;
+            
+            Logger.Log($"Acquired directory guard for '{directory}' (Mutex: {mutexTime}ms, Event: {eventTime}ms, Guard: {guardTime}ms)");
             return true;
         }
         catch (UnauthorizedAccessException)

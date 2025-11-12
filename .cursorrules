@@ -6,3 +6,11 @@ Use ASCII quotes only; avoid smart quotes.
 
 Do not include emojis in any output.
 
+ML/LLM model features (NSFW detection, object detection, or any future LLM integrations) must be disabled by default in ViewerConfig.CreateDefault(). Models must only initialize when explicitly enabled in config.json AND the model file exists locally. Never automatically download models or engage ML/LLM services without explicit user action.
+
+Do not log arrow key navigation actions (pan, next image, previous image) to reduce log noise.
+
+Never change user configuration files (config.json, settings files, etc.) without explicit user request. If a setting needs to be changed to fix an issue, inform the user and suggest the change rather than making it automatically.
+
+NEVER remove user-facing features, functionality, or UI elements without explicit approval, even for optimization purposes. Always explore alternatives like lazy-loading, caching, or refactoring first. If removal is the only option, present detailed trade-offs and wait for explicit buy-in before proceeding. What users can do matters more than milliseconds saved.
+

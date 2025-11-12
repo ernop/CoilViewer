@@ -22,12 +22,19 @@ The viewer relies on Windows Imaging Component. Any additional codecs registered
 
 ## Usage
 
-- Launch `CoilViewer.exe` directly or pass a file/folder path: `CoilViewer.exe "C:\path\image.png"`
+- Launch `CoilViewer.exe` directly, double-click an image file, or pass a file/folder path: `CoilViewer.exe "C:\path\image.png"`
 - Keyboard:
   - `Right`, `Down`, `Space`: next image
   - `Left`, `Up`, `Backspace`: previous image
+  - `Home`/`End`: jump to first/last image
+  - `Ctrl+Shift+Arrow`: jump halfway toward start/end of sequence
+  - `A`: archive current image to "old" subfolder (moves file and shows next image instantly)
   - `Ctrl+O`: open image to load its folder
   - `Ctrl+R`: reload `config.json`
+  - `I`: toggle metadata overlay
+  - `/` or `?`: show keyboard shortcuts
+  - `=`/`-`: zoom in/out
+  - `\`: reset zoom
   - `F11` or double-click: toggle fullscreen
   - `Esc`: exit fullscreen or close the app
 - Mouse:
@@ -45,8 +52,7 @@ A `config.json` file is created next to the executable on first launch:
 
 ```json
 {
-  "PreloadRadius": 10,
-  "MaxCachedImages": 21,
+  "PreloadImageCount": 20,
   "BackgroundColor": "#000000",
   "FitMode": "Uniform",
   "ScalingMode": "HighQuality",
@@ -57,8 +63,7 @@ A `config.json` file is created next to the executable on first launch:
 }
 ```
 
-- `PreloadRadius`: number of images to preload on each side of the current image.
-- `MaxCachedImages`: upper bound for cached images (auto-clamped to cover the preload window).
+- `PreloadImageCount`: number of images to preload on each side of the current image. The cache will hold up to (PreloadImageCount * 2 + 1) images total. Default: 20.
 - `BackgroundColor`: any WPF color string (e.g. `#111111`, `Black`).
 - `FitMode`: `Uniform`, `UniformToFill`, `Fill`, or `None`.
 - `ScalingMode`: `HighQuality`, `Fant`, `LowQuality`, or `NearestNeighbor`.

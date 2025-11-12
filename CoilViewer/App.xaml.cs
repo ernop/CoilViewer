@@ -1,5 +1,6 @@
 ﻿using System.Configuration;
 using System.Data;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -10,16 +11,37 @@ namespace CoilViewer;
 /// <summary>
 /// Interaction logic for App.xaml
 /// </summary>
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
+    private static NsfwDetectionService? _nsfwService;
+    private static ObjectDetectionService? _objectService;
+
+    public static NsfwDetectionService? NsfwService => _nsfwService;
+    public static ObjectDetectionService? ObjectService => _objectService;
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        var totalTimer = Stopwatch.StartNew();
+        var stepTimer = Stopwatch.StartNew();
+
         base.OnStartup(e);
-
+        Logger.Log($"[STARTUP] base.OnStartup: {stepTimer.ElapsedMilliseconds}ms");
+        
+        stepTimer.Restart();
         Logger.LogLaunch(e.Args);
+        Logger.Log($"[STARTUP] Logger.LogLaunch: {stepTimer.ElapsedMilliseconds}ms");
 
+        stepTimer.Restart();
         var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
         var config = ViewerConfig.Load(configPath);
+        Logger.Log($"[STARTUP] Config loading: {stepTimer.ElapsedMilliseconds}ms");
+
+        stepTimer.Restart();
+        // Initialize ML models asynchronously in the background to avoid blocking UI startup
+        InitializeModelsAsync(config);
+        Logger.Log($"[STARTUP] InitializeModelsAsync (fire and forget): {stepTimer.ElapsedMilliseconds}ms");
+
+        stepTimer.Restart();
         var initialPathInput = e.Args.FirstOrDefault();
         string? resolvedInitialPath = null;
         if (!string.IsNullOrWhiteSpace(initialPathInput))
@@ -27,7 +49,9 @@ public partial class App : Application
             resolvedInitialPath = ResolvePath(initialPathInput);
             Logger.LogPathProbe(initialPathInput, resolvedInitialPath);
         }
+        Logger.Log($"[STARTUP] Path resolution: {stepTimer.ElapsedMilliseconds}ms");
 
+        stepTimer.Restart();
         DirectoryInstanceGuard? initialGuard = null;
         var initialTarget = resolvedInitialPath ?? initialPathInput;
         var initialDirectory = DirectoryInstanceGuard.ResolveDirectory(initialTarget);
@@ -40,9 +64,87 @@ public partial class App : Application
                 return;
             }
         }
+        Logger.Log($"[STARTUP] DirectoryInstanceGuard setup: {stepTimer.ElapsedMilliseconds}ms");
 
-        var window = new MainWindow(config, configPath, resolvedInitialPath ?? initialPathInput, initialGuard);
-        window.Show();
+        try
+        {
+            stepTimer.Restart();
+            var window = new MainWindow(config, configPath, resolvedInitialPath ?? initialPathInput, initialGuard);
+            Logger.Log($"[STARTUP] MainWindow constructor: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
+            window.Show();
+            Logger.Log($"[STARTUP] window.Show(): {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
+            window.Activate();
+            
+            // Ensure window is brought to front
+            if (window.WindowState == WindowState.Minimized)
+            {
+                window.WindowState = WindowState.Normal;
+            }
+            
+            window.Topmost = true;
+            window.Topmost = false;
+            window.Focus();
+            Logger.Log($"[STARTUP] Window activation and focus: {stepTimer.ElapsedMilliseconds}ms");
+            
+            totalTimer.Stop();
+            Logger.Log($"[STARTUP] ========== TOTAL APP STARTUP TIME: {totalTimer.ElapsedMilliseconds}ms ==========");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Failed to create or show MainWindow", ex);
+            System.Windows.MessageBox.Show($"Failed to start CoilViewer: {ex.Message}", "CoilViewer Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+        }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _nsfwService?.Dispose();
+        _objectService?.Dispose();
+        base.OnExit(e);
+    }
+
+    private static async void InitializeModelsAsync(ViewerConfig config)
+    {
+        // Run model initialization on background thread to avoid blocking startup
+        await System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                // Initialize NSFW detection service if enabled
+                if (config.EnableNsfwDetection && !string.IsNullOrWhiteSpace(config.NsfwModelPath))
+                {
+                    var service = new NsfwDetectionService();
+                    service.Initialize(config.NsfwModelPath);
+                    _nsfwService = service;
+                    Logger.Log("NSFW detection service initialized in background.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to initialize NSFW detection service", ex);
+            }
+
+            try
+            {
+                // Initialize object detection service if enabled
+                if (config.EnableObjectDetection && !string.IsNullOrWhiteSpace(config.ObjectModelPath))
+                {
+                    var service = new ObjectDetectionService();
+                    service.Initialize(config.ObjectModelPath, config.ObjectLabelsPath, config.ObjectDetectionInputSize);
+                    _objectService = service;
+                    Logger.Log("Object detection service initialized in background.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to initialize object detection service", ex);
+            }
+        });
     }
 
     private static string? ResolvePath(string input)

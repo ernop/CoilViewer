@@ -26,4 +26,7 @@ CoilViewer/Generated/
 *.vsp
 *.vspx
 
-
+# ML Models (large files, user-specific)
+Models/*.onnx
+Models/*.txt
+!Models/.gitkeep

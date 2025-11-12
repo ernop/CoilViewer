@@ -6,52 +6,48 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <BuildCounterFile>$(MSBuildThisFileDirectory)build.counter</BuildCounterFile>
     <GeneratedVersionOutputDir>$(MSBuildThisFileDirectory)Generated\</GeneratedVersionOutputDir>
     <GeneratedVersionFile>$(GeneratedVersionOutputDir)BuildVersionInfo.g.cs</GeneratedVersionFile>
     <ApplicationIcon>Assets\CoilViewer.ico</ApplicationIcon>
+    <NoWarn>$(NoWarn);CS2002</NoWarn>
+    <RuntimeFrameworkVersion>8.0.20</RuntimeFrameworkVersion>
+    <WindowsDesktopSharedFrameworkVersion>8.0.20</WindowsDesktopSharedFrameworkVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    
+    <!-- Aggressive startup performance optimizations -->
+    <TieredCompilation>true</TieredCompilation>
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <!-- ReadyToRun enabled for Release builds only via publish profile -->
+  </PropertyGroup>
+  
+  <!-- ReadyToRun: Enable for Release builds to pre-compile for faster startup -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunComposite>true</PublishReadyToRunComposite>
   </PropertyGroup>
 
-  <Target Name="IncrementBuildCounter" BeforeTargets="CoreCompile">
-    <ReadLinesFromFile File="$(BuildCounterFile)" Condition="Exists('$(BuildCounterFile)')">
-      <Output TaskParameter="Lines" ItemName="ExistingBuildCounterValue" />
-    </ReadLinesFromFile>
-
-    <PropertyGroup>
-      <CurrentBuildCounter>0</CurrentBuildCounter>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'@(ExistingBuildCounterValue)'!=''">
-      <CurrentBuildCounter>@(ExistingBuildCounterValue)</CurrentBuildCounter>
-    </PropertyGroup>
-
+  <Target Name="IncrementBuildCounter" BeforeTargets="BeforeBuild">
     <PropertyGroup>
       <IsTempProject>$([System.String]::Copy('$(MSBuildProjectName)').EndsWith('_wpftmp'))</IsTempProject>
-      <ShouldIncrement Condition="'$(IsTempProject)'=='True'">False</ShouldIncrement>
-      <ShouldIncrement Condition="'$(ShouldIncrement)'==''">True</ShouldIncrement>
-    </PropertyGroup>
-
-    <PropertyGroup>
-      <NewBuildCounter Condition="'$(ShouldIncrement)'=='True'">$([MSBuild]::Add($(CurrentBuildCounter), 1))</NewBuildCounter>
-      <NewBuildCounter Condition="'$(ShouldIncrement)'!='True'">$(CurrentBuildCounter)</NewBuildCounter>
+      <CurrentBuildCounter Condition="Exists('$(BuildCounterFile)')">$([System.IO.File]::ReadAllText('$(BuildCounterFile)').Trim())</CurrentBuildCounter>
+      <CurrentBuildCounter Condition="'$(CurrentBuildCounter)' == ''">0</CurrentBuildCounter>
+      <NewBuildCounter Condition="'$(IsTempProject)' != 'True'">$([MSBuild]::Add($(CurrentBuildCounter), 1))</NewBuildCounter>
+      <NewBuildCounter Condition="'$(IsTempProject)' == 'True'">$(CurrentBuildCounter)</NewBuildCounter>
       <BuildVersionString>0.000$(NewBuildCounter)</BuildVersionString>
     </PropertyGroup>
 
     <WriteLinesToFile File="$(BuildCounterFile)"
                       Lines="$(NewBuildCounter)"
                       Overwrite="true"
-                      Condition="'$(ShouldIncrement)'=='True'" />
+                      Condition="'$(IsTempProject)' != 'True'" />
 
-    <WriteLinesToFile File="$(BuildCounterFile)"
-                      Lines="$(NewBuildCounter)"
-                      Overwrite="true"
-                      Condition="'$(ShouldIncrement)'!='True' and !Exists('$(BuildCounterFile)')" />
-
-    <MakeDir Directories="$(GeneratedVersionOutputDir)" Condition="'$(GeneratedVersionOutputDir)'!=''" />
+    <MakeDir Directories="$(GeneratedVersionOutputDir)" Condition="'$(GeneratedVersionOutputDir)' != ''" />
 
     <ItemGroup>
       <GeneratedVersionFileLines Include="using System.Reflection%3B" />
-      <GeneratedVersionFileLines Include=" " />
       <GeneratedVersionFileLines Include="namespace CoilViewer" />
       <GeneratedVersionFileLines Include="{" />
       <GeneratedVersionFileLines Include="    internal static class BuildVersion" />
@@ -67,14 +63,15 @@
                       Lines="@(GeneratedVersionFileLines)"
                       Overwrite="true" />
 
-    <ItemGroup>
-      <Compile Update="$(GeneratedVersionFile)" AutoGen="True" DesignTime="True" />
+    <ItemGroup Condition="'$(IsTempProject)' != 'True'">
+      <Compile Include="$(GeneratedVersionFile)" />
     </ItemGroup>
 
-    <Message Importance="High" Text="CoilViewer Build: $(BuildVersionString)" />
+    <Message Importance="High" Text="CoilViewer Build: $(BuildVersionString)" Condition="'$(IsTempProject)' != 'True'" />
   </Target>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.19.0" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
   </ItemGroup>
 
@@ -86,6 +83,9 @@
     <Resource Include="Assets\CoilViewer_32.png" />
     <Resource Include="Assets\CoilViewer_16.png" />
     <Content Include="Assets\CoilViewer.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

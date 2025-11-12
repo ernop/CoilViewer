@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
@@ -69,7 +70,7 @@ internal sealed class ImageCache
         }
 
         var indices = new List<int>();
-        for (int offset = -_config.PreloadRadius; offset <= _config.PreloadRadius; offset++)
+        for (int offset = -_config.PreloadImageCount; offset <= _config.PreloadImageCount; offset++)
         {
             var idx = WrapIndex(centerIndex + offset);
             if (idx >= 0)
@@ -86,24 +87,44 @@ internal sealed class ImageCache
 
     private BitmapSource LoadBitmap(int index)
     {
-        var path = _sequence[index];
+        var totalTimer = Stopwatch.StartNew();
+        var stepTimer = Stopwatch.StartNew();
 
+        var path = _sequence[index];
+        Logger.Log($"[IMAGECACHE] Get path from sequence: {stepTimer.ElapsedMilliseconds}ms");
+
+        stepTimer.Restart();
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        Logger.Log($"[IMAGECACHE] Open FileStream for '{Path.GetFileName(path)}': {stepTimer.ElapsedMilliseconds}ms");
+        
+        stepTimer.Restart();
         var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
+        Logger.Log($"[IMAGECACHE] BitmapDecoder.Create: {stepTimer.ElapsedMilliseconds}ms");
+        
+        stepTimer.Restart();
         var frame = decoder.Frames[0];
+        Logger.Log($"[IMAGECACHE] Get decoder.Frames[0]: {stepTimer.ElapsedMilliseconds}ms");
+        
+        stepTimer.Restart();
         frame.Freeze();
+        Logger.Log($"[IMAGECACHE] frame.Freeze(): {stepTimer.ElapsedMilliseconds}ms");
+        
+        totalTimer.Stop();
+        Logger.Log($"[IMAGECACHE] ========== TOTAL LOADBITMAP TIME for '{Path.GetFileName(path)}': {totalTimer.ElapsedMilliseconds}ms ==========");
+        
         return frame;
     }
 
     private void Trim(int centerIndex)
     {
-        if (_cache.Count <= _config.MaxCachedImages)
+        var maxCacheSize = (_config.PreloadImageCount * 2) + 1;
+        if (_cache.Count <= maxCacheSize)
         {
             return;
         }
 
         var valid = new HashSet<int>();
-        for (int offset = -_config.PreloadRadius; offset <= _config.PreloadRadius; offset++)
+        for (int offset = -_config.PreloadImageCount; offset <= _config.PreloadImageCount; offset++)
         {
             var idx = WrapIndex(centerIndex + offset);
             if (idx >= 0)

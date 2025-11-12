@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -12,6 +13,12 @@ internal sealed class ImageSequence
         ".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".bmp", ".dib", ".gif", ".tiff", ".tif", ".webp"
     };
 
+    private static bool IsSupportedExtension(string extension)
+    {
+        return SupportedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private readonly List<string> _allImages = new();
     private readonly List<string> _images = new();
 
     public IReadOnlyList<string> Images => _images;
@@ -28,6 +35,9 @@ internal sealed class ImageSequence
 
     public void LoadFromPath(string path, SortField sortField, SortDirection sortDirection, string? preferredImage = null)
     {
+        var totalTimer = Stopwatch.StartNew();
+        var stepTimer = Stopwatch.StartNew();
+
         if (string.IsNullOrWhiteSpace(path))
         {
             throw new ArgumentException("Path must be provided", nameof(path));
@@ -37,7 +47,9 @@ internal sealed class ImageSequence
         var directory = attributes.HasFlag(FileAttributes.Directory)
             ? new DirectoryInfo(path)
             : new FileInfo(path).Directory ?? throw new InvalidOperationException("Unable to determine directory");
+        Logger.Log($"[IMAGESEQUENCE] Get directory info: {stepTimer.ElapsedMilliseconds}ms");
 
+        stepTimer.Restart();
         DirectoryPath = directory.FullName;
         SortField = sortField;
         SortDirection = sortDirection;
@@ -46,7 +58,9 @@ internal sealed class ImageSequence
         var files = directory
             .EnumerateFiles()
             .Where(f => IsSupportedExtension(f.Extension));
+        Logger.Log($"[IMAGESEQUENCE] EnumerateFiles and filter: {stepTimer.ElapsedMilliseconds}ms");
 
+        stepTimer.Restart();
         files = SortField switch
         {
             SortField.CreationTime => SortDirection == SortDirection.Ascending
@@ -62,14 +76,23 @@ internal sealed class ImageSequence
                 ? files.OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
                 : files.OrderByDescending(f => f.Name, StringComparer.OrdinalIgnoreCase)
         };
+        Logger.Log($"[IMAGESEQUENCE] Apply sort ordering: {stepTimer.ElapsedMilliseconds}ms");
 
+        stepTimer.Restart();
         _images.AddRange(files.Select(f => f.FullName));
+        Logger.Log($"[IMAGESEQUENCE] Materialize file list ({_images.Count} files): {stepTimer.ElapsedMilliseconds}ms");
+        
+        stepTimer.Restart();
+        _allImages.Clear();
+        _allImages.AddRange(_images);
+        Logger.Log($"[IMAGESEQUENCE] Copy to _allImages: {stepTimer.ElapsedMilliseconds}ms");
 
         if (_images.Count == 0)
         {
             throw new InvalidOperationException($"No supported images found in '{directory.FullName}'.");
         }
 
+        stepTimer.Restart();
         string? initialPath = preferredImage;
         if (!attributes.HasFlag(FileAttributes.Directory))
         {
@@ -89,6 +112,10 @@ internal sealed class ImageSequence
         {
             CurrentIndex = 0;
         }
+        Logger.Log($"[IMAGESEQUENCE] Find initial index: {stepTimer.ElapsedMilliseconds}ms");
+        
+        totalTimer.Stop();
+        Logger.Log($"[IMAGESEQUENCE] ========== TOTAL LOADFROMPATH TIME: {totalTimer.ElapsedMilliseconds}ms ==========");
     }
 
     public int CurrentIndex { get; private set; }
@@ -164,6 +191,48 @@ internal sealed class ImageSequence
         return true;
     }
 
+    public bool RemoveByPath(string path)
+    {
+        if (_images.Count == 0)
+        {
+            return false;
+        }
+
+        var index = _images.FindIndex(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+        {
+            return false;
+        }
+
+        _images.RemoveAt(index);
+
+        if (_images.Count == 0)
+        {
+            CurrentIndex = 0;
+            return false;
+        }
+
+        // Adjust CurrentIndex if the removed item was before or at the current position
+        if (index <= CurrentIndex)
+        {
+            if (CurrentIndex > 0)
+            {
+                CurrentIndex--;
+            }
+            else
+            {
+                CurrentIndex = 0;
+            }
+        }
+
+        if (CurrentIndex >= _images.Count)
+        {
+            CurrentIndex = _images.Count - 1;
+        }
+
+        return true;
+    }
+
     public bool JumpToFirst()
     {
         if (_images.Count == 0)
@@ -224,8 +293,88 @@ internal sealed class ImageSequence
         return true;
     }
 
-    private static bool IsSupportedExtension(string extension)
+    public void ApplyFilters(
+        DetectionCache detectionCache,
+        NsfwFilterMode nsfwFilter,
+        ObjectFilterMode objectFilter,
+        string objectFilterText,
+        float objectFilterThreshold)
     {
-        return SupportedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
+        // Save current path before filtering
+        string? currentPath = null;
+        if (_images.Count > 0 && CurrentIndex >= 0 && CurrentIndex < _images.Count)
+        {
+            currentPath = _images[CurrentIndex];
+        }
+
+        _images.Clear();
+        
+        foreach (var imagePath in _allImages)
+        {
+            bool include = true;
+
+            // Apply NSFW filter
+            if (nsfwFilter != NsfwFilterMode.All)
+            {
+                var nsfwResult = detectionCache.GetNsfwResult(imagePath);
+                bool isNsfw = nsfwResult?.IsNsfw == true;
+
+                if (nsfwFilter == NsfwFilterMode.NoNsfw && isNsfw)
+                {
+                    include = false;
+                }
+                else if (nsfwFilter == NsfwFilterMode.NsfwOnly && !isNsfw)
+                {
+                    include = false;
+                }
+            }
+
+            // Apply object filter
+            if (include && objectFilter != ObjectFilterMode.ShowAll && !string.IsNullOrWhiteSpace(objectFilterText))
+            {
+                var objectResult = detectionCache.GetObjectResult(imagePath);
+                bool containsObject = objectResult?.Predictions.Any(p =>
+                    p.Confidence >= objectFilterThreshold &&
+                    p.ClassName.ToLowerInvariant().Contains(objectFilterText.ToLowerInvariant())) == true;
+
+                if (objectFilter == ObjectFilterMode.ShowOnly && !containsObject)
+                {
+                    include = false;
+                }
+                else if (objectFilter == ObjectFilterMode.Exclude && containsObject)
+                {
+                    include = false;
+                }
+            }
+
+            if (include)
+            {
+                _images.Add(imagePath);
+            }
+        }
+
+        // Adjust current index if needed
+        if (_images.Count == 0)
+        {
+            CurrentIndex = 0;
+        }
+        else if (currentPath != null)
+        {
+            var newIndex = _images.IndexOf(currentPath);
+            if (newIndex >= 0)
+            {
+                CurrentIndex = newIndex;
+            }
+            else
+            {
+                CurrentIndex = Math.Min(CurrentIndex, _images.Count - 1);
+            }
+        }
+        else if (CurrentIndex >= _images.Count)
+        {
+            CurrentIndex = _images.Count - 1;
+        }
     }
+
+    public int AllImagesCount => _allImages.Count;
 }

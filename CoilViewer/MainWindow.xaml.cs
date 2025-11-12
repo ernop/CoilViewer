@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -12,12 +13,24 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Documents;
 using System.Windows.Threading;
 using System.Drawing.Imaging;
 using Microsoft.Win32;
 
 using Point = System.Windows.Point;
 using Vector = System.Windows.Vector;
+using DataObject = System.Windows.DataObject;
+using DragEventArgs = System.Windows.DragEventArgs;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+using MouseEventArgs = System.Windows.Input.MouseEventArgs;
+using Clipboard = System.Windows.Clipboard;
+using ColorConverter = System.Windows.Media.ColorConverter;
+using Cursors = System.Windows.Input.Cursors;
+using DataFormats = System.Windows.DataFormats;
+using DragDropEffects = System.Windows.DragDropEffects;
+using MediaColor = System.Windows.Media.Color;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 namespace CoilViewer;
 
 /// <summary>
@@ -43,10 +56,12 @@ public partial class MainWindow : Window
     private readonly string _configPath;
     private readonly ImageSequence _sequence = new();
     private ImageCache? _cache;
+    private readonly DetectionCache _detectionCache = new();
     private DirectoryInstanceGuard? _directoryGuard;
     private bool _isFullscreen;
     private bool _overlayVisible;
     private bool _shortcutsVisible;
+    private bool _filterPanelVisible;
     private double _fitScale = MinZoom;
     private double _zoomScale = MinZoom;
     private BitmapSource? _currentBitmap;
@@ -61,12 +76,19 @@ public partial class MainWindow : Window
     private readonly Stack<ArchiveStep> _archiveHistory = new();
     private readonly DispatcherTimer _statusTimer;
     private static readonly TimeSpan StatusDisplayDuration = TimeSpan.FromSeconds(2.5);
+    private const string QuadraticHintTag = "QuadraticHint";
+    private bool _isQuadraticHintVisible;
     private readonly record struct ArchiveAction(string OriginalPath, string ArchivedPath);
 
     internal MainWindow(ViewerConfig config, string configPath, string? initialPath, DirectoryInstanceGuard? initialGuard)
     {
-        InitializeComponent();
+        var totalTimer = Stopwatch.StartNew();
+        var stepTimer = Stopwatch.StartNew();
 
+        InitializeComponent();
+        Logger.Log($"[MAINWINDOW] InitializeComponent: {stepTimer.ElapsedMilliseconds}ms");
+
+        stepTimer.Restart();
         _config = config;
         _configPath = configPath;
         _directoryGuard = initialGuard;
@@ -74,25 +96,41 @@ public partial class MainWindow : Window
         _directoryGuard?.SetRequestHandler(OnExternalOpenRequest);
         _statusTimer = new DispatcherTimer { Interval = StatusDisplayDuration };
         _statusTimer.Tick += OnStatusTimerTick;
+        Logger.Log($"[MAINWINDOW] Field initialization: {stepTimer.ElapsedMilliseconds}ms");
 
+        stepTimer.Restart();
         ApplyConfig();
+        Logger.Log($"[MAINWINDOW] ApplyConfig: {stepTimer.ElapsedMilliseconds}ms");
+        
+        stepTimer.Restart();
         UpdateContextMenu();
+        Logger.Log($"[MAINWINDOW] UpdateContextMenu: {stepTimer.ElapsedMilliseconds}ms");
+        
+        stepTimer.Restart();
+        InitializeFilterControls();
+        Logger.Log($"[MAINWINDOW] InitializeFilterControls: {stepTimer.ElapsedMilliseconds}ms");
 
         Loaded += (_, _) => Focus();
 
+        stepTimer.Restart();
         if (!string.IsNullOrWhiteSpace(initialPath))
         {
             LoadSequence(initialPath);
+            Logger.Log($"[MAINWINDOW] LoadSequence: {stepTimer.ElapsedMilliseconds}ms");
         }
         else
         {
             ShowMessage("Press Ctrl+O to open an image.");
+            Logger.Log($"[MAINWINDOW] ShowMessage (no initial path): {stepTimer.ElapsedMilliseconds}ms");
         }
+        
+        totalTimer.Stop();
+        Logger.Log($"[MAINWINDOW] ========== TOTAL MAINWINDOW CONSTRUCTOR TIME: {totalTimer.ElapsedMilliseconds}ms ==========");
     }
 
     private void ApplyConfig()
     {
-        if (ColorConverter.ConvertFromString(_config.BackgroundColor) is Color color)
+        if (ColorConverter.ConvertFromString(_config.BackgroundColor) is MediaColor color)
         {
             Backdrop.Background = new SolidColorBrush(color);
         }
@@ -132,54 +170,131 @@ public partial class MainWindow : Window
 
     private async Task DisplayCurrentAsync()
     {
+        var totalTimer = Stopwatch.StartNew();
+        var stepTimer = Stopwatch.StartNew();
+        var isInitialLoad = _currentBitmap == null; // Track if this is the first image load
+
         if (_cache == null || !_sequence.HasImages)
         {
+            Logger.Log($"[DISPLAYCURRENT] Early return (no cache or images): {stepTimer.ElapsedMilliseconds}ms");
             return;
         }
 
+        stepTimer.Restart();
         SetShortcutsVisibility(false);
+        Logger.Log($"[DISPLAYCURRENT] SetShortcutsVisibility: {stepTimer.ElapsedMilliseconds}ms");
 
+        stepTimer.Restart();
         var index = _sequence.CurrentIndex;
         var path = _sequence.CurrentPath;
+        Logger.Log($"[DISPLAYCURRENT] Get current index and path: {stepTimer.ElapsedMilliseconds}ms");
 
+        stepTimer.Restart();
         if (_cache.TryGetCached(index, out var cached) && cached != null)
         {
+            Logger.Log($"[DISPLAYCURRENT] TryGetCached (HIT): {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             _currentBitmap = cached;
             ImageDisplay.Source = cached;
             HideMessage();
+            Logger.Log($"[DISPLAYCURRENT] Set ImageDisplay.Source (cached): {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             UpdateFitScale(cached, forceReset: true);
+            Logger.Log($"[DISPLAYCURRENT] UpdateFitScale: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             UpdateOverlay(cached, path, index);
+            Logger.Log($"[DISPLAYCURRENT] UpdateOverlay: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             UpdateContextMenu();
+            Logger.Log($"[DISPLAYCURRENT] UpdateContextMenu: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             UpdateWindowTitle();
+            Logger.Log($"[DISPLAYCURRENT] UpdateWindowTitle: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             _cache.PreloadAround(index);
+            Logger.Log($"[DISPLAYCURRENT] PreloadAround (fire and forget): {stepTimer.ElapsedMilliseconds}ms");
+            
+            totalTimer.Stop();
+            Logger.Log($"[DISPLAYCURRENT] ========== TOTAL DISPLAYCURRENT TIME (CACHED): {totalTimer.ElapsedMilliseconds}ms ==========");
+            
+            if (isInitialLoad)
+            {
+                ShowStatus($"Image loaded from cache in {totalTimer.ElapsedMilliseconds}ms");
+            }
             return;
         }
 
+        Logger.Log($"[DISPLAYCURRENT] TryGetCached (MISS): {stepTimer.ElapsedMilliseconds}ms");
+
+        stepTimer.Restart();
         ShowMessage("Loading...");
+        Logger.Log($"[DISPLAYCURRENT] ShowMessage: {stepTimer.ElapsedMilliseconds}ms");
 
         try
         {
+            stepTimer.Restart();
             var bitmap = await _cache.GetOrLoadAsync(index);
+            Logger.Log($"[DISPLAYCURRENT] _cache.GetOrLoadAsync (actual load): {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             _currentBitmap = bitmap;
             ImageDisplay.Source = bitmap;
             HideMessage();
+            Logger.Log($"[DISPLAYCURRENT] Set ImageDisplay.Source (loaded): {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             UpdateFitScale(bitmap, forceReset: true);
+            Logger.Log($"[DISPLAYCURRENT] UpdateFitScale: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             UpdateOverlay(bitmap, path, index);
+            Logger.Log($"[DISPLAYCURRENT] UpdateOverlay: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             UpdateContextMenu();
+            Logger.Log($"[DISPLAYCURRENT] UpdateContextMenu: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             UpdateWindowTitle();
+            Logger.Log($"[DISPLAYCURRENT] UpdateWindowTitle: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             _cache.PreloadAround(index);
+            Logger.Log($"[DISPLAYCURRENT] PreloadAround (fire and forget): {stepTimer.ElapsedMilliseconds}ms");
+            
+            totalTimer.Stop();
+            Logger.Log($"[DISPLAYCURRENT] ========== TOTAL DISPLAYCURRENT TIME (LOADED): {totalTimer.ElapsedMilliseconds}ms ==========");
+            
+            if (isInitialLoad)
+            {
+                ShowStatus($"Image loaded in {totalTimer.ElapsedMilliseconds}ms");
+            }
         }
         catch (Exception ex)
         {
             Logger.LogError($"Failed to load index={index}, path='{path}'", ex);
-            ShowMessage($"Failed to load image: {ex.Message}");
+            ShowMessage($"Failed to load image '{Path.GetFileName(path)}': {ex.Message}");
         }
     }
 
     private void UpdateOverlay(BitmapSource bitmap, string path, int index)
     {
         string fileName = Path.GetFileName(path);
-        OverlayTitle.Text = fileName;
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            fileName = path;
+        }
+
+        fileName = NormalizeFileNameDisplay(fileName);
+
+        OverlayDetails.Text = string.Empty;
+        OverlayDetails.ToolTip = null;
 
         long fileSize = 0;
         string? sortValue = null;
@@ -196,18 +311,109 @@ public partial class MainWindow : Window
         }
 
         var position = index + 1;
-        OverlayDetails.Text = $"{bitmap.PixelWidth}×{bitmap.PixelHeight} • {FormatFileSize(fileSize)} • {position}/{_sequence.Count}";
+        var overlayMeta = new List<string>
+        {
+            $"{bitmap.PixelWidth}×{bitmap.PixelHeight}",
+            FormatFileSize(fileSize),
+            $"{position}/{_sequence.Count}"
+        };
+        OverlayTitle.Text = string.Join(" • ", overlayMeta);
         UpdateWindowTitle();
 
-        if (!string.IsNullOrEmpty(sortValue))
+        OverlaySort.Visibility = Visibility.Collapsed;
+        OverlaySort.Text = string.Empty;
+
+        // Clear previous detection results when switching images
+        ClearDetectionResults();
+
+        // Check NSFW content if enabled (for caching)
+        if (_config.EnableNsfwDetection && App.NsfwService?.IsAvailable == true)
         {
-            OverlaySort.Visibility = Visibility.Visible;
-            OverlaySort.Text = $"{GetFieldLabel(_sequence.SortField)}: {sortValue}";
+            _ = CheckNsfwContentAsync(path);
         }
-        else
+
+        // Check object content if enabled (for caching)
+        if (_config.EnableObjectDetection && App.ObjectService?.IsAvailable == true)
         {
-            OverlaySort.Visibility = Visibility.Collapsed;
+            _ = CheckObjectContentAsync(path);
         }
+        
+        // Auto-run and display detections if filter panel is open
+        if (_filterPanelVisible)
+        {
+            RunDetectionsForCurrentImage();
+        }
+    }
+
+    private async Task CheckNsfwContentAsync(string imagePath)
+    {
+        if (App.NsfwService == null || !App.NsfwService.IsAvailable)
+        {
+            return;
+        }
+
+        // Skip if already cached
+        if (_detectionCache.HasNsfwResult(imagePath))
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.Run(() =>
+            {
+                var result = App.NsfwService.CheckImage(imagePath);
+                _detectionCache.SetNsfwResult(imagePath, result);
+                
+                if (result != null && result.IsNsfw && result.Confidence >= _config.NsfwThreshold)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        Logger.Log($"NSFW content detected in '{imagePath}' (confidence: {result.Confidence:P2})");
+                    });
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Failed to check NSFW content for '{imagePath}'", ex);
+        }
+    }
+
+    private async Task CheckObjectContentAsync(string imagePath)
+    {
+        if (App.ObjectService == null || !App.ObjectService.IsAvailable)
+        {
+            return;
+        }
+
+        // Skip if already cached
+        if (_detectionCache.HasObjectResult(imagePath))
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.Run(() =>
+            {
+                var result = App.ObjectService.DetectObjects(imagePath, topK: 10);
+                _detectionCache.SetObjectResult(imagePath, result);
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Failed to check object content for '{imagePath}'", ex);
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        var nsfwFilter = Enum.TryParse<NsfwFilterMode>(_config.NsfwFilterMode, out var nsfw) ? nsfw : NsfwFilterMode.All;
+        var objectFilter = Enum.TryParse<ObjectFilterMode>(_config.ObjectFilterMode, out var obj) ? obj : ObjectFilterMode.ShowAll;
+        
+        _sequence.ApplyFilters(_detectionCache, nsfwFilter, objectFilter, _config.ObjectFilterText, _config.ObjectFilterThreshold);
+        _ = DisplayCurrentAsync();
     }
 
     private void UpdateWindowTitle()
@@ -222,9 +428,27 @@ public partial class MainWindow : Window
         if (_sequence.HasImages)
         {
             title += $" ({_sequence.CurrentIndex + 1}/{_sequence.Count})";
+            
+            // Add filename to title
+            string fileName = Path.GetFileName(_sequence.CurrentPath);
+            if (!string.IsNullOrWhiteSpace(fileName))
+            {
+                fileName = NormalizeFileNameDisplay(fileName);
+                title += $" — {fileName}";
+            }
         }
 
-        Title = title;
+        var sortLabel = $"Sort: {GetFieldLabel(_sequence.SortField)} {GetDirectionLabel(_sequence.SortDirection)}";
+        if (_sequence.HasImages && _sequence.SortField != SortField.FileName)
+        {
+            var sortValue = GetCurrentSortValue();
+            if (!string.IsNullOrEmpty(sortValue))
+            {
+                sortLabel += $" ({sortValue})";
+            }
+        }
+
+        Title = $"{title} — {sortLabel}";
     }
 
     private static string FormatFileSize(long bytes)
@@ -247,6 +471,27 @@ public partial class MainWindow : Window
         };
     }
 
+    private static string NormalizeFileNameDisplay(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return fileName;
+        }
+
+        var extension = Path.GetExtension(fileName);
+        if (string.IsNullOrEmpty(extension))
+        {
+            return fileName;
+        }
+
+        if (fileName.EndsWith(extension + extension, StringComparison.OrdinalIgnoreCase))
+        {
+            return fileName.Substring(0, fileName.Length - extension.Length);
+        }
+
+        return fileName;
+    }
+
     private void ShowMessage(string text)
     {
         MessageBlock.Text = text;
@@ -258,9 +503,32 @@ public partial class MainWindow : Window
         MessageBlock.Visibility = Visibility.Collapsed;
     }
 
-    private void ShowStatus(string text)
+    private void ShowStatus(string text, bool persistent = false)
     {
+        StatusText.Inlines.Clear();
         StatusText.Text = text;
+        StatusText.Tag = null;
+        StatusBar.Visibility = Visibility.Visible;
+        _statusTimer.Stop();
+        _isQuadraticHintVisible = false;
+
+        if (!persistent)
+        {
+            _statusTimer.Start();
+        }
+    }
+
+    private void ShowQuadraticJumpStatus(int previousIndex, int newIndex)
+    {
+        StatusText.Text = string.Empty;
+        StatusText.Inlines.Clear();
+        StatusText.Tag = null;
+        _isQuadraticHintVisible = false;
+        StatusText.Inlines.Add(new Run("Half jump: "));
+        StatusText.Inlines.Add(new Run($"{previousIndex + 1}") { FontWeight = FontWeights.Bold });
+        StatusText.Inlines.Add(new Run(" -> "));
+        StatusText.Inlines.Add(new Run($"{newIndex + 1}") { FontWeight = FontWeights.Bold });
+        StatusText.Inlines.Add(new Run($" of {_sequence.Count}"));
         StatusBar.Visibility = Visibility.Visible;
         _statusTimer.Stop();
         _statusTimer.Start();
@@ -271,7 +539,142 @@ public partial class MainWindow : Window
         _statusTimer.Stop();
         StatusBar.Visibility = Visibility.Collapsed;
         StatusText.Text = string.Empty;
+        StatusText.Inlines.Clear();
+        StatusText.Tag = null;
+        _isQuadraticHintVisible = false;
     }
+
+    private void ShowQuadraticModeHint()
+    {
+        if (_isQuadraticHintVisible)
+        {
+            return;
+        }
+
+        string message;
+        if (_sequence.HasImages && _sequence.Count > 0)
+        {
+            var current = _sequence.CurrentIndex + 1;
+            var total = _sequence.Count;
+            message = $"Quadratic mode ready: {current}/{total}. Press Left/Up to jump halfway toward the start, Right/Down toward the end. Release Ctrl+Shift to exit.";
+        }
+        else
+        {
+            message = "Quadratic mode ready: open an image to jump halfway toward the start or end.";
+        }
+
+        ShowStatus(message, persistent: true);
+        StatusText.Tag = QuadraticHintTag;
+        _isQuadraticHintVisible = true;
+    }
+
+    private void HideQuadraticModeHint()
+    {
+        if (!_isQuadraticHintVisible)
+        {
+            return;
+        }
+
+        _isQuadraticHintVisible = false;
+
+        if (Equals(StatusText.Tag, QuadraticHintTag))
+        {
+            StatusText.Tag = null;
+            HideStatus();
+        }
+    }
+
+    private void ClearQuadraticHintState()
+    {
+        if (_isQuadraticHintVisible)
+        {
+            _isQuadraticHintVisible = false;
+        }
+
+        if (Equals(StatusText.Tag, QuadraticHintTag))
+        {
+            StatusText.Tag = null;
+        }
+    }
+
+    private void UpdateQuadraticHintForKeyDown(Key key)
+    {
+        if (IsQuadraticMoveModifiersActive())
+        {
+            if (!_isQuadraticHintVisible && IsQuadraticModifierKey(key))
+            {
+                ShowQuadraticModeHint();
+            }
+        }
+        else if (_isQuadraticHintVisible && IsQuadraticModifierKey(key))
+        {
+            HideQuadraticModeHint();
+        }
+    }
+
+    private bool IsInputControlFocused()
+    {
+        var focusedElement = Keyboard.FocusedElement;
+        return focusedElement is System.Windows.Controls.TextBox || focusedElement is System.Windows.Controls.ComboBox;
+    }
+
+    private static bool IsInputControl(object? element)
+    {
+        if (element == null)
+        {
+            return false;
+        }
+        
+        // Check if the element itself is an input control
+        if (element is System.Windows.Controls.TextBox || 
+            element is System.Windows.Controls.ComboBox ||
+            element is System.Windows.Controls.PasswordBox)
+        {
+            return true;
+        }
+        
+        // Check if the element is inside a ComboBox (when dropdown is open)
+        if (element is System.Windows.FrameworkElement fe)
+        {
+            var parent = System.Windows.Media.VisualTreeHelper.GetParent(fe);
+            while (parent != null)
+            {
+                if (parent is System.Windows.Controls.ComboBox || 
+                    parent is System.Windows.Controls.TextBox)
+                {
+                    return true;
+                }
+                parent = System.Windows.Media.VisualTreeHelper.GetParent(parent);
+            }
+        }
+        
+        return false;
+    }
+
+    private void UpdateQuadraticHintForKeyUp()
+    {
+        if (IsQuadraticMoveModifiersActive())
+        {
+            if (!_isQuadraticHintVisible)
+            {
+                ShowQuadraticModeHint();
+            }
+        }
+        else
+        {
+            HideQuadraticModeHint();
+        }
+    }
+
+    private bool IsQuadraticMoveModifiersActive()
+    {
+        return Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
+            && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)
+            && !Keyboard.Modifiers.HasFlag(ModifierKeys.Alt);
+    }
+
+    private static bool IsQuadraticModifierKey(Key key) =>
+        key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift;
 
     private void OnStatusTimerTick(object? sender, EventArgs e)
     {
@@ -315,7 +718,11 @@ public partial class MainWindow : Window
         }
 
         var currentPath = _sequence.CurrentPath;
+        var currentIndex = _sequence.CurrentIndex;
+        var hasNext = currentIndex + 1 < _sequence.Count;
 
+        // Calculate target path before removing from sequence
+        string targetPath;
         try
         {
             var fileInfo = new FileInfo(currentPath);
@@ -323,56 +730,77 @@ public partial class MainWindow : Window
             var targetDirectory = Path.Combine(directory.FullName, "old");
             Directory.CreateDirectory(targetDirectory);
 
-            var targetPath = Path.Combine(targetDirectory, fileInfo.Name);
+            var originalExtension = Path.GetExtension(currentPath);
+            var originalBaseName = Path.GetFileNameWithoutExtension(currentPath);
+            targetPath = Path.Combine(targetDirectory, Path.GetFileName(currentPath));
             if (File.Exists(targetPath))
             {
-                var baseName = Path.GetFileNameWithoutExtension(fileInfo.Name);
-                var extension = fileInfo.Extension;
                 var counter = 1;
                 do
                 {
-                    targetPath = Path.Combine(targetDirectory, $"{baseName}_{counter}{extension}");
+                    targetPath = Path.Combine(targetDirectory, $"{originalBaseName}_{counter}{originalExtension}");
                     counter++;
                 } while (File.Exists(targetPath));
-            }
-
-            File.Move(currentPath, targetPath);
-            _archiveHistory.Push(new ArchiveStep(currentPath, targetPath));
-            Logger.Log($"Moved image '{currentPath}' to '{targetPath}'");
-
-            if (_sequence.RemoveCurrent())
-            {
-                _cache = new ImageCache(_sequence, _config);
-                ResetZoom();
-                UpdateContextMenu();
-                await DisplayCurrentAsync();
-                HideMessage();
-                ShowStatus($"Moved to '{targetPath}'.");
-            }
-            else
-            {
-                _cache = null;
-                _currentBitmap = null;
-                ImageDisplay.Source = null;
-                OverlayTitle.Text = string.Empty;
-                OverlayDetails.Text = string.Empty;
-                OverlaySort.Text = string.Empty;
-                SetOverlayVisibility(false, animate: false);
-                UpdateContextMenu();
-                _fitScale = MinZoom;
-                ImageFitTransform.ScaleX = _fitScale;
-                ImageFitTransform.ScaleY = _fitScale;
-                SetZoom(_fitScale);
-                ShowStatus($"Moved to '{targetPath}'.");
-                ShowMessage("No images remain.");
-                UpdateWindowTitle();
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to move image '{currentPath}'", ex);
-            ShowMessage($"Failed to move image: {ex.Message}");
+            Logger.LogError($"Failed to prepare move for image '{currentPath}'", ex);
+            ShowMessage($"Failed to move image '{Path.GetFileName(currentPath)}': {ex.Message}");
+            return;
         }
+
+        // Immediately move to next image and display it (if available)
+        if (hasNext)
+        {
+            _sequence.MoveNext(loop: false);
+        }
+
+        // Remove the archived image from sequence
+        var removed = _sequence.RemoveByPath(currentPath);
+
+        // Update cache after removal
+        if (removed)
+        {
+            _cache = new ImageCache(_sequence, _config);
+            ResetZoom();
+            UpdateContextMenu();
+            await DisplayCurrentAsync();
+        }
+        else
+        {
+            _cache = null;
+            _currentBitmap = null;
+            ImageDisplay.Source = null;
+            OverlayTitle.Text = string.Empty;
+            OverlayDetails.Text = string.Empty;
+            OverlaySort.Text = string.Empty;
+            SetOverlayVisibility(false, animate: false);
+            UpdateContextMenu();
+            _fitScale = MinZoom;
+            ImageFitTransform.ScaleX = _fitScale;
+            ImageFitTransform.ScaleY = _fitScale;
+            SetZoom(_fitScale);
+            ShowMessage("No images remain.");
+            UpdateWindowTitle();
+        }
+
+        // Do the actual file move in the background (fire and forget)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Run(() => File.Move(currentPath, targetPath));
+                _archiveHistory.Push(new ArchiveStep(currentPath, targetPath));
+                Logger.Log($"Moved image '{currentPath}' to '{targetPath}'");
+                Dispatcher.Invoke(() => ShowStatus($"Moved to '{targetPath}'."));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to move image '{currentPath}'", ex);
+                Dispatcher.Invoke(() => ShowMessage($"Failed to move image '{Path.GetFileName(currentPath)}': {ex.Message}"));
+            }
+        });
     }
 
     private void UndoLastArchive()
@@ -486,12 +914,21 @@ public partial class MainWindow : Window
 
     private void OnKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape && _shortcutsVisible)
+        // Escape key ALWAYS closes the program, even when typing in input fields
+        if (e.Key == Key.Escape)
         {
-            ToggleShortcuts(forceHide: true);
+            Close();
             e.Handled = true;
             return;
         }
+
+        // Don't process other shortcuts if user is typing in an input control
+        if (IsInputControlFocused() || IsInputControl(e.Source) || IsInputControl(e.OriginalSource))
+        {
+            return;
+        }
+
+        UpdateQuadraticHintForKeyDown(e.Key);
 
         if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift))
         {
@@ -505,6 +942,8 @@ public partial class MainWindow : Window
                     {
                         Logger.Log($"Quadratic move forward: key={e.Key}, from={previousIndex}, to={_sequence.CurrentIndex}, total={_sequence.Count}");
                         _ = DisplayCurrentAsync();
+                        ClearQuadraticHintState();
+                        ShowQuadraticJumpStatus(previousIndex, _sequence.CurrentIndex);
                     }
 
                     e.Handled = true;
@@ -518,6 +957,8 @@ public partial class MainWindow : Window
                     {
                         Logger.Log($"Quadratic move backward: key={e.Key}, from={previousIndex}, to={_sequence.CurrentIndex}, total={_sequence.Count}");
                         _ = DisplayCurrentAsync();
+                        ClearQuadraticHintState();
+                        ShowQuadraticJumpStatus(previousIndex, _sequence.CurrentIndex);
                     }
 
                     e.Handled = true;
@@ -534,7 +975,6 @@ public partial class MainWindow : Window
             case Key.Up:
                 if (IsZoomed())
                 {
-                    Logger.Log($"Arrow key pan requested: key={e.Key}, zoomScale={_zoomScale:0.###}, fitScale={_fitScale:0.###}, pan=({_panOffset.X:0.##},{_panOffset.Y:0.##})");
                     BeginSmoothPan(e.Key);
                     e.Handled = true;
                 }
@@ -542,12 +982,10 @@ public partial class MainWindow : Window
                 {
                     if (e.Key == Key.Right || e.Key == Key.Down)
                     {
-                        Logger.Log($"Arrow key next image: key={e.Key}");
                         MoveNext();
                     }
                     else
                     {
-                        Logger.Log($"Arrow key previous image: key={e.Key}");
                         MovePrevious();
                     }
 
@@ -613,8 +1051,17 @@ public partial class MainWindow : Window
                 PromptOpenImage();
                 e.Handled = true;
                 break;
+            case Key.OemComma when Keyboard.Modifiers.HasFlag(ModifierKeys.Control):
+            case Key.S when Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift):
+                OnSettingsClick(this, new RoutedEventArgs());
+                e.Handled = true;
+                break;
             case Key.I:
                 ToggleOverlay();
+                e.Handled = true;
+                break;
+            case Key.F:
+                ToggleFilterPanel();
                 e.Handled = true;
                 break;
             case Key.Oem2:
@@ -622,23 +1069,13 @@ public partial class MainWindow : Window
                 ToggleShortcuts();
                 e.Handled = true;
                 break;
-            case Key.Escape:
-                if (_isFullscreen)
-                {
-                    ToggleFullscreen();
-                    e.Handled = true;
-                }
-                else
-                {
-                    Close();
-                }
-
-                break;
         }
     }
 
     private void OnKeyUp(object sender, KeyEventArgs e)
     {
+        UpdateQuadraticHintForKeyUp();
+
         if (!IsPanKey(e.Key))
         {
             return;
@@ -657,6 +1094,22 @@ public partial class MainWindow : Window
 
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            var position = e.GetPosition(ImageScrollViewer);
+            if (e.Delta > 0)
+            {
+                ZoomIn(position);
+            }
+            else if (e.Delta < 0)
+            {
+                ZoomOut(position);
+            }
+
+            e.Handled = true;
+            return;
+        }
+
         if (e.Delta > 0)
         {
             MovePrevious();
@@ -714,17 +1167,24 @@ public partial class MainWindow : Window
 
     private void LoadSequence(string path, string? preferredImage = null)
     {
+        var totalTimer = Stopwatch.StartNew();
+        var stepTimer = Stopwatch.StartNew();
+
         var resolvedDirectory = DirectoryInstanceGuard.ResolveDirectory(path);
         var requestTarget = preferredImage ?? path;
+        Logger.Log($"[LOADSEQUENCE] ResolveDirectory: {stepTimer.ElapsedMilliseconds}ms");
 
         try
         {
+            stepTimer.Restart();
             if (resolvedDirectory != null && !EnsureDirectoryGuard(resolvedDirectory, requestTarget))
             {
                 ShowMessage($"Directory is already open in another Coil Viewer window: {resolvedDirectory}");
                 return;
             }
+            Logger.Log($"[LOADSEQUENCE] EnsureDirectoryGuard: {stepTimer.ElapsedMilliseconds}ms");
 
+            stepTimer.Restart();
             var field = SortOptions.ParseField(_config.SortField);
             var direction = SortOptions.ParseDirection(_config.SortDirection);
 
@@ -735,12 +1195,30 @@ public partial class MainWindow : Window
             }
 
             Logger.Log($"LoadSequence path='{path}', focus='{focus}', field={field}, direction={direction}");
+            Logger.Log($"[LOADSEQUENCE] Parse sort options and resolve focus: {stepTimer.ElapsedMilliseconds}ms");
 
+            stepTimer.Restart();
             _sequence.LoadFromPath(path, field, direction, focus);
+            Logger.Log($"[LOADSEQUENCE] _sequence.LoadFromPath: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             _cache = new ImageCache(_sequence, _config);
+            Logger.Log($"[LOADSEQUENCE] Create ImageCache: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             UpdateWindowTitle();
+            Logger.Log($"[LOADSEQUENCE] UpdateWindowTitle: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             UpdateContextMenu();
+            Logger.Log($"[LOADSEQUENCE] UpdateContextMenu: {stepTimer.ElapsedMilliseconds}ms");
+            
+            stepTimer.Restart();
             _ = DisplayCurrentAsync();
+            Logger.Log($"[LOADSEQUENCE] DisplayCurrentAsync (fire and forget): {stepTimer.ElapsedMilliseconds}ms");
+            
+            totalTimer.Stop();
+            Logger.Log($"[LOADSEQUENCE] ========== TOTAL LOADSEQUENCE TIME: {totalTimer.ElapsedMilliseconds}ms ==========");
         }
         catch (Exception ex)
         {
@@ -923,6 +1401,15 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Logger.LogError("Failed to copy full path to clipboard.", ex);
+        }
+    }
+
+    private void OnSettingsClick(object sender, RoutedEventArgs e)
+    {
+        var settingsWindow = new SettingsWindow(_config, _configPath);
+        if (settingsWindow.ShowDialog() == true)
+        {
+            ReloadConfig();
         }
     }
 
@@ -1177,6 +1664,117 @@ public partial class MainWindow : Window
         SetOverlayVisibility(!_overlayVisible, animate: true);
     }
 
+    private void ToggleFilterPanel()
+    {
+        SetFilterPanelVisibility(!_filterPanelVisible, animate: true);
+    }
+
+    private void SetFilterPanelVisibility(bool visible, bool animate)
+    {
+        _filterPanelVisible = visible;
+        FilterPanel.BeginAnimation(UIElement.OpacityProperty, null);
+
+        if (!visible)
+        {
+            if (animate)
+            {
+                var fadeOut = new DoubleAnimation(FilterPanel.Opacity, 0.0, TimeSpan.FromMilliseconds(150));
+                fadeOut.Completed += (_, _) => FilterPanel.Visibility = Visibility.Collapsed;
+                FilterPanel.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+            }
+            else
+            {
+                FilterPanel.Opacity = 0;
+                FilterPanel.Visibility = Visibility.Collapsed;
+            }
+            return;
+        }
+
+        FilterPanel.Visibility = Visibility.Visible;
+        if (animate)
+        {
+            var fadeIn = new DoubleAnimation(FilterPanel.Opacity, 1.0, TimeSpan.FromMilliseconds(150));
+            FilterPanel.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+        }
+        else
+        {
+            FilterPanel.Opacity = 1.0;
+        }
+        
+        // Auto-run detections when filter panel opens
+        RunDetectionsForCurrentImage();
+    }
+
+    private void OnNsfwFilterChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_config == null || string.IsNullOrEmpty(_configPath))
+        {
+            return;
+        }
+
+        if (NsfwFilterCombo.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+        {
+            _config.NsfwFilterMode = tag;
+            _config.Save(_configPath);
+        }
+    }
+
+    private void OnObjectFilterChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_config == null || string.IsNullOrEmpty(_configPath))
+        {
+            return;
+        }
+
+        if (ObjectFilterCombo.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+        {
+            _config.ObjectFilterMode = tag;
+            _config.Save(_configPath);
+        }
+    }
+
+    private void OnObjectFilterTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_config == null || string.IsNullOrEmpty(_configPath))
+        {
+            return;
+        }
+
+        if (sender is System.Windows.Controls.TextBox textBox)
+        {
+            _config.ObjectFilterText = textBox.Text;
+            _config.Save(_configPath);
+        }
+    }
+
+    private void OnApplyFiltersClick(object sender, RoutedEventArgs e)
+    {
+        ApplyFilters();
+        ShowStatus($"Applied filters: {_sequence.Count} images shown");
+    }
+
+    private void InitializeFilterControls()
+    {
+        // Initialize NSFW filter
+        var nsfwFilterIndex = _config.NsfwFilterMode switch
+        {
+            "NoNsfw" => 1,
+            "NsfwOnly" => 2,
+            _ => 0
+        };
+        NsfwFilterCombo.SelectedIndex = nsfwFilterIndex;
+
+        // Initialize object filter
+        var objectFilterIndex = _config.ObjectFilterMode switch
+        {
+            "ShowOnly" => 1,
+            "Exclude" => 2,
+            _ => 0
+        };
+        ObjectFilterCombo.SelectedIndex = objectFilterIndex;
+        ObjectFilterText.Text = _config.ObjectFilterText;
+    }
+
     private void SetOverlayVisibility(bool visible, bool animate)
     {
         _overlayVisible = visible;
@@ -1213,76 +1811,86 @@ public partial class MainWindow : Window
 
     private void SetShortcutsVisibility(bool visible, bool animate = true)
     {
-        if (_shortcutsVisible == visible)
+        if (_shortcutsVisible == visible && ((visible && ShortcutsOverlay.Visibility == Visibility.Visible) ||
+            (!visible && ShortcutsOverlay.Visibility != Visibility.Visible)))
         {
-            if (visible && ShortcutsOverlay.Visibility == Visibility.Visible)
-            {
-                return;
-            }
-
-            if (!visible && ShortcutsOverlay.Visibility != Visibility.Visible)
-            {
-                return;
-            }
+            return;
         }
 
         _shortcutsVisible = visible;
         ShortcutsOverlay.BeginAnimation(UIElement.OpacityProperty, null);
 
-        if (visible)
+        if (!visible)
         {
-            ShortcutsOverlay.Visibility = Visibility.Visible;
+            if (ShortcutsOverlay.Visibility != Visibility.Visible)
+            {
+                ShortcutsOverlay.Visibility = Visibility.Collapsed;
+                ShortcutsOverlay.Opacity = 0;
+                return;
+            }
 
             if (animate)
             {
-                var fadeIn = new DoubleAnimation(ShortcutsOverlay.Opacity, 1.0, TimeSpan.FromMilliseconds(180))
+                var fadeOut = new DoubleAnimation(ShortcutsOverlay.Opacity, 0.0, TimeSpan.FromMilliseconds(150));
+                fadeOut.Completed += (_, _) =>
                 {
-                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                    ShortcutsOverlay.Visibility = Visibility.Collapsed;
+                    ShortcutsOverlay.Opacity = 0;
                 };
-                ShortcutsOverlay.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+                ShortcutsOverlay.BeginAnimation(UIElement.OpacityProperty, fadeOut);
             }
             else
             {
-                ShortcutsOverlay.Opacity = 1.0;
+                ShortcutsOverlay.Opacity = 0;
+                ShortcutsOverlay.Visibility = Visibility.Collapsed;
             }
 
             return;
         }
 
-        if (!animate || ShortcutsOverlay.Visibility != Visibility.Visible)
+        ShortcutsOverlay.Visibility = Visibility.Visible;
+        if (animate)
         {
-            ShortcutsOverlay.Visibility = Visibility.Collapsed;
-            ShortcutsOverlay.Opacity = 0.0;
-            return;
+            var fadeIn = new DoubleAnimation(ShortcutsOverlay.Opacity, 1.0, TimeSpan.FromMilliseconds(150));
+            ShortcutsOverlay.BeginAnimation(UIElement.OpacityProperty, fadeIn);
         }
-
-        var fadeOut = new DoubleAnimation(ShortcutsOverlay.Opacity, 0.0, TimeSpan.FromMilliseconds(140))
+        else
         {
-            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
-        };
-        fadeOut.Completed += (_, _) =>
-        {
-            ShortcutsOverlay.Visibility = Visibility.Collapsed;
-        };
-        ShortcutsOverlay.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+            ShortcutsOverlay.Opacity = 1.0;
+        }
     }
 
     private void ToggleShortcuts(bool forceHide = false)
     {
-        var targetVisibility = forceHide ? false : !_shortcutsVisible;
-        SetShortcutsVisibility(targetVisibility);
+        if (forceHide)
+        {
+            SetShortcutsVisibility(false);
+            return;
+        }
+
+        SetShortcutsVisibility(!_shortcutsVisible);
     }
 
     private bool IsZoomed() => _zoomScale > _fitScale + 0.001;
 
-    private void ZoomIn()
+    private void ZoomIn(Point? anchor = null)
     {
-        SetZoom(_zoomScale * ZoomStep);
+        if (!TryGetViewportSize(out _, out _) && anchor.HasValue)
+        {
+            anchor = null;
+        }
+
+        SetZoom(_zoomScale * ZoomStep, anchor);
     }
 
-    private void ZoomOut()
+    private void ZoomOut(Point? anchor = null)
     {
-        SetZoom(_zoomScale / ZoomStep);
+        if (!TryGetViewportSize(out _, out _) && anchor.HasValue)
+        {
+            anchor = null;
+        }
+
+        SetZoom(_zoomScale / ZoomStep, anchor);
     }
 
     private void ResetZoom()
@@ -1292,17 +1900,48 @@ public partial class MainWindow : Window
         SetZoom(_fitScale);
     }
 
-    private void SetZoom(double scale)
+    private void SetZoom(double scale, Point? anchor = null)
     {
         var fit = Math.Max(_fitScale, 0.01);
         var clamped = Math.Clamp(scale, fit, MaxZoom);
+
+        var hadViewport = TryGetViewportSize(out var viewportWidth, out var viewportHeight);
+        var previousRelative = ImageZoomTransform.ScaleX;
+        if (double.IsNaN(previousRelative) || previousRelative <= 0)
+        {
+            previousRelative = 1.0;
+        }
+
+        Vector viewportVector = new();
+        Vector imageVector = new();
+
+        if (anchor.HasValue && hadViewport)
+        {
+            var anchorPoint = anchor.Value;
+            viewportVector = new Vector(anchorPoint.X - viewportWidth * 0.5, anchorPoint.Y - viewportHeight * 0.5);
+            imageVector = (viewportVector + _panOffset) / previousRelative;
+        }
+        else if (hadViewport)
+        {
+            viewportVector = new Vector(0, 0);
+            imageVector = _panOffset / previousRelative;
+        }
+
         _zoomScale = clamped;
 
         var relative = clamped / fit;
         ImageZoomTransform.ScaleX = relative;
         ImageZoomTransform.ScaleY = relative;
 
-        ClampPan();
+        if (anchor.HasValue && hadViewport)
+        {
+            var newPan = imageVector * relative - viewportVector;
+            ApplyPan(newPan.X, newPan.Y);
+        }
+        else
+        {
+            ClampPan();
+        }
 
         if (!IsZoomed())
         {
@@ -1610,23 +2249,75 @@ public partial class MainWindow : Window
             return false;
         }
 
-        double viewportWidth = ImageScrollViewer.ViewportWidth;
-        double viewportHeight = ImageScrollViewer.ViewportHeight;
-
-        if (viewportWidth <= 0 || viewportHeight <= 0)
+        if (!TryGetViewportSize(out double viewportWidth, out double viewportHeight))
         {
             return false;
         }
 
-        double baseWidth = PixelsToDip(_currentBitmap.PixelWidth, _currentBitmap.DpiX) * _fitScale;
-        double baseHeight = PixelsToDip(_currentBitmap.PixelHeight, _currentBitmap.DpiY) * _fitScale;
-        double zoomFactor = ImageZoomTransform.ScaleX;
+        if (!TryGetContentSize(out double contentWidth, out double contentHeight))
+        {
+            return false;
+        }
 
-        double contentWidth = baseWidth * zoomFactor;
-        double contentHeight = baseHeight * zoomFactor;
+        var overflowWidth = contentWidth - viewportWidth;
+        var overflowHeight = contentHeight - viewportHeight;
 
-        maxX = Math.Max(0, (contentWidth - viewportWidth) / 2);
-        maxY = Math.Max(0, (contentHeight - viewportHeight) / 2);
+        maxX = overflowWidth > 0 ? overflowWidth * 0.5 : 0;
+        maxY = overflowHeight > 0 ? overflowHeight * 0.5 : 0;
+        return true;
+    }
+
+    private bool TryGetViewportSize(out double width, out double height)
+    {
+        width = ImageScrollViewer.ViewportWidth;
+        height = ImageScrollViewer.ViewportHeight;
+
+        if (double.IsNaN(width) || width <= 0)
+        {
+            width = ImageScrollViewer.ActualWidth;
+        }
+
+        if (double.IsNaN(height) || height <= 0)
+        {
+            height = ImageScrollViewer.ActualHeight;
+        }
+
+        if (width <= 0 || height <= 0)
+        {
+            width = 0;
+            height = 0;
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryGetContentSize(out double width, out double height)
+    {
+        width = ImageDisplay.RenderSize.Width;
+        height = ImageDisplay.RenderSize.Height;
+
+        if (double.IsNaN(width) || width <= 0 || double.IsNaN(height) || height <= 0)
+        {
+            if (_currentBitmap == null)
+            {
+                width = 0;
+                height = 0;
+                return false;
+            }
+
+            width = PixelsToDip(_currentBitmap.PixelWidth, _currentBitmap.DpiX) * _fitScale;
+            height = PixelsToDip(_currentBitmap.PixelHeight, _currentBitmap.DpiY) * _fitScale;
+        }
+
+        var zoomFactor = ImageZoomTransform.ScaleX;
+        if (double.IsNaN(zoomFactor) || zoomFactor <= 0)
+        {
+            zoomFactor = 1.0;
+        }
+
+        width *= zoomFactor;
+        height *= zoomFactor;
         return true;
     }
 
@@ -1697,6 +2388,239 @@ public partial class MainWindow : Window
         {
             UpdateFitScale(_currentBitmap, forceReset: !IsZoomed());
         }
+    }
+
+    private void OnCheckNsfwClick(object sender, RoutedEventArgs e)
+    {
+        if (!_sequence.HasImages || App.NsfwService == null || !App.NsfwService.IsAvailable)
+        {
+            ShowStatus("NSFW detection not available.");
+            return;
+        }
+
+        var currentPath = _sequence.CurrentPath;
+        if (string.IsNullOrEmpty(currentPath))
+        {
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var result = App.NsfwService.CheckImage(currentPath);
+            stopwatch.Stop();
+            var elapsedMs = stopwatch.ElapsedMilliseconds;
+            Dispatcher.Invoke(() => DisplayNsfwResult(result, elapsedMs));
+        });
+    }
+
+    private void OnRunObjectDetectionClick(object sender, RoutedEventArgs e)
+    {
+        if (!_sequence.HasImages || App.ObjectService == null || !App.ObjectService.IsAvailable)
+        {
+            ShowStatus("Object detection not available.");
+            return;
+        }
+
+        var currentPath = _sequence.CurrentPath;
+        if (string.IsNullOrEmpty(currentPath))
+        {
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var result = App.ObjectService.DetectObjects(currentPath, topK: 25);
+            stopwatch.Stop();
+            var elapsedMs = stopwatch.ElapsedMilliseconds;
+            Dispatcher.Invoke(() => DisplayObjectResult(result, elapsedMs));
+        });
+    }
+
+    private void OnSearchObjectClick(object sender, RoutedEventArgs e)
+    {
+        var searchTerm = ObjectSearchText.Text?.Trim();
+        if (string.IsNullOrEmpty(searchTerm))
+        {
+            ShowStatus("Please enter a search term.");
+            return;
+        }
+
+        if (!_sequence.HasImages || App.ObjectService == null || !App.ObjectService.IsAvailable)
+        {
+            ShowStatus("Object detection not available.");
+            return;
+        }
+
+        var currentPath = _sequence.CurrentPath;
+        if (string.IsNullOrEmpty(currentPath))
+        {
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var result = App.ObjectService.DetectObjects(currentPath, topK: 50);
+            stopwatch.Stop();
+            var elapsedMs = stopwatch.ElapsedMilliseconds;
+            var matchingObjects = result?.Predictions
+                .Where(p => p.ClassName.ToLowerInvariant().Contains(searchTerm.ToLowerInvariant()))
+                .ToList();
+
+            Dispatcher.Invoke(() =>
+            {
+                if (matchingObjects != null && matchingObjects.Any())
+                {
+                    DisplayObjectResult(new ObjectDetectionResult { Predictions = matchingObjects }, elapsedMs);
+                    ShowStatus($"Found {matchingObjects.Count} match(es) for '{searchTerm}' in {elapsedMs}ms.");
+                }
+                else
+                {
+                    DetectionResultsPanel.Visibility = Visibility.Visible;
+                    ObjectResultsPanel.Visibility = Visibility.Visible;
+                    ObjectTagsList.ItemsSource = null;
+                    ShowStatus($"No matches found for '{searchTerm}' ({elapsedMs}ms).");
+                }
+            });
+        });
+    }
+
+    private void ClearDetectionResults()
+    {
+        DetectionResultsPanel.Visibility = Visibility.Collapsed;
+        NsfwResultsPanel.Visibility = Visibility.Collapsed;
+        ObjectResultsPanel.Visibility = Visibility.Collapsed;
+        ObjectTagsList.ItemsSource = null;
+    }
+    
+    private void RunDetectionsForCurrentImage()
+    {
+        if (!_sequence.HasImages)
+        {
+            return;
+        }
+        
+        var currentPath = _sequence.CurrentPath;
+        if (string.IsNullOrEmpty(currentPath))
+        {
+            return;
+        }
+        
+        // Run NSFW detection if available
+        if (App.NsfwService?.IsAvailable == true)
+        {
+            _ = Task.Run(() =>
+            {
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var result = App.NsfwService.CheckImage(currentPath);
+                stopwatch.Stop();
+                var elapsedMs = stopwatch.ElapsedMilliseconds;
+                Dispatcher.Invoke(() => DisplayNsfwResult(result, elapsedMs));
+            });
+        }
+        
+        // Run object detection if available
+        if (App.ObjectService?.IsAvailable == true)
+        {
+            _ = Task.Run(() =>
+            {
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var result = App.ObjectService.DetectObjects(currentPath, topK: 10);
+                stopwatch.Stop();
+                var elapsedMs = stopwatch.ElapsedMilliseconds;
+                Dispatcher.Invoke(() => DisplayObjectResult(result, elapsedMs));
+            });
+        }
+    }
+
+    private void DisplayNsfwResult(NsfwDetectionResult? result, long elapsedMs = 0)
+    {
+        if (result == null)
+        {
+            ShowStatus("No NSFW detection result.");
+            return;
+        }
+
+        DetectionResultsPanel.Visibility = Visibility.Visible;
+        NsfwResultsPanel.Visibility = Visibility.Visible;
+
+        if (result.IsNsfw)
+        {
+            NsfwResultText.Text = "NSFW";
+            NsfwResultBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 68, 68)); // Red
+        }
+        else
+        {
+            NsfwResultText.Text = "SAFE";
+            NsfwResultBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(68, 255, 68)); // Green
+        }
+
+        var timingText = elapsedMs > 0 ? $" ({elapsedMs}ms)" : "";
+        NsfwConfidenceText.Text = $"Confidence: {result.Confidence * 100:F1}%{timingText}";
+        
+        ShowStatus($"NSFW check complete: {(result.IsNsfw ? "NSFW" : "SAFE")} ({result.Confidence * 100:F1}% confidence) - {elapsedMs}ms");
+    }
+
+    private void DisplayObjectResult(ObjectDetectionResult? result, long elapsedMs = 0)
+    {
+        if (result == null || result.Predictions.Count == 0)
+        {
+            var timingText = elapsedMs > 0 ? $" ({elapsedMs}ms)" : "";
+            ShowStatus($"No objects detected{timingText}.");
+            return;
+        }
+
+        // Filter predictions by minimum confidence threshold (15% seems reasonable for real detections)
+        const float MinConfidenceThreshold = 0.15f;
+        var filteredPredictions = result.Predictions
+            .Where(p => p.Confidence >= MinConfidenceThreshold)
+            .ToList();
+
+        if (filteredPredictions.Count == 0)
+        {
+            var timingText = elapsedMs > 0 ? $" ({elapsedMs}ms)" : "";
+            ShowStatus($"No objects detected with sufficient confidence{timingText}.");
+            DetectionResultsPanel.Visibility = Visibility.Visible;
+            ObjectResultsPanel.Visibility = Visibility.Visible;
+            ObjectTagsList.ItemsSource = null;
+            return;
+        }
+
+        DetectionResultsPanel.Visibility = Visibility.Visible;
+        ObjectResultsPanel.Visibility = Visibility.Visible;
+
+        var tags = filteredPredictions.Select((p, index) => new ObjectTag
+        {
+            Rank = index + 1,
+            Name = p.ClassName,
+            Confidence = p.Confidence,
+            ConfidencePercent = $"{p.Confidence * 100:F1}%",
+            RawConfidence = $"{p.Confidence:F4}"
+        }).ToList();
+
+        ObjectTagsList.ItemsSource = tags;
+        
+        var topPrediction = filteredPredictions.FirstOrDefault();
+        var timingSuffix = elapsedMs > 0 ? $" - {elapsedMs}ms" : "";
+        if (topPrediction != null)
+        {
+            ShowStatus($"Top: {topPrediction.ClassName} ({topPrediction.Confidence * 100:F1}%) - {filteredPredictions.Count} object(s) detected{timingSuffix}");
+        }
+        else
+        {
+            ShowStatus($"Detected {filteredPredictions.Count} object(s){timingSuffix}.");
+        }
+    }
+
+    private sealed class ObjectTag
+    {
+        public int Rank { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public float Confidence { get; set; }
+        public string ConfidencePercent { get; set; } = string.Empty;
+        public string RawConfidence { get; set; } = string.Empty;
     }
 
     private readonly struct ArchiveStep

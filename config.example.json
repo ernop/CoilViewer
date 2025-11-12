@@ -1,0 +1,23 @@
+{
+  "PreloadRadius": 10,
+  "MaxCachedImages": 21,
+  "BackgroundColor": "#000000",
+  "FitMode": "Uniform",
+  "ScalingMode": "HighQuality",
+  "ShowOverlay": true,
+  "LoopAround": true,
+  "SortField": "FileName",
+  "SortDirection": "Ascending",
+  "EnableNsfwDetection": false,
+  "NsfwModelPath": "..\\..\\..\\..\\Models\\nsfw_detector.onnx",
+  "NsfwThreshold": 0.5,
+  "NsfwFilterMode": "All",
+  "EnableObjectDetection": false,
+  "ObjectModelPath": "..\\..\\..\\..\\Models\\mobilenet_v2.onnx",
+  "ObjectLabelsPath": "..\\..\\..\\..\\Models\\imagenet_labels.txt",
+  "ObjectDetectionInputSize": 0,
+  "ObjectFilterMode": "ShowAll",
+  "ObjectFilterText": "",
+  "ObjectFilterThreshold": 0.1
+}
+

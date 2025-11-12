@@ -16,51 +16,7 @@
         AllowDrop="True"
         Drop="OnDrop"
         PreviewDragOver="OnPreviewDragOver">
-    <Window.Resources>
-        <LinearGradientBrush x:Key="ShortcutOverlayBackground"
-                             StartPoint="0,0"
-                             EndPoint="0,1">
-            <GradientStop Color="#FF252533"
-                          Offset="0" />
-            <GradientStop Color="#FF171722"
-                          Offset="1" />
-        </LinearGradientBrush>
-        <Style x:Key="ShortcutCardStyle"
-               TargetType="Border">
-            <Setter Property="Padding"
-                    Value="12,10" />
-            <Setter Property="Margin"
-                    Value="0,0,12,12" />
-            <Setter Property="CornerRadius"
-                    Value="8" />
-            <Setter Property="Background"
-                    Value="#26FFFFFF" />
-        </Style>
-        <Style x:Key="ShortcutKeyStyle"
-               TargetType="TextBlock">
-            <Setter Property="FontSize"
-                    Value="14" />
-            <Setter Property="FontWeight"
-                    Value="SemiBold" />
-            <Setter Property="Foreground"
-                    Value="White" />
-            <Setter Property="Opacity"
-                    Value="0.95" />
-            <Setter Property="TextWrapping"
-                    Value="Wrap" />
-        </Style>
-        <Style x:Key="ShortcutDescriptionStyle"
-               TargetType="TextBlock">
-            <Setter Property="Margin"
-                    Value="0,4,0,0" />
-            <Setter Property="Foreground"
-                    Value="#CCFFFFFF" />
-            <Setter Property="FontSize"
-                    Value="12" />
-            <Setter Property="TextWrapping"
-                    Value="Wrap" />
-        </Style>
-    </Window.Resources>
+    <!-- Window.Resources removed - styles were only used by removed shortcuts overlay -->
     <Window.ContextMenu>
         <ContextMenu x:Name="MainContextMenu" Opened="OnContextMenuOpened">
             <MenuItem x:Name="MenuCopyFullPathMenuItem"
@@ -113,6 +69,9 @@
                       IsCheckable="True"
                       Click="OnSortOptionClick"
                       Tag="FileSize|Descending" />
+            <Separator />
+            <MenuItem Header="Settings..."
+                      Click="OnSettingsClick" />
         </ContextMenu>
     </Window.ContextMenu>
     <Grid>
@@ -167,164 +126,395 @@
             <StackPanel>
                 <TextBlock x:Name="OverlayTitle"
                            Foreground="White"
-                           FontSize="18"
-                           FontWeight="Bold" />
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Opacity="0.9" />
                 <TextBlock x:Name="OverlayDetails"
                            Foreground="White"
-                           FontSize="14"
-                           Opacity="0.8" />
+                           FontSize="12"
+                           Opacity="0.85"
+                           TextWrapping="Wrap"
+                           MaxWidth="420" />
                 <TextBlock x:Name="OverlaySort"
                            Foreground="White"
-                           FontSize="14"
+                           FontSize="12"
                            Opacity="0.8"
+                           Margin="0,4,0,0"
                            Visibility="Collapsed" />
             </StackPanel>
         </Border>
 
+        <Border x:Name="FilterPanel"
+                Background="#88000000"
+                CornerRadius="4"
+                Padding="12"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Stretch"
+                Margin="16"
+                Visibility="Collapsed"
+                Opacity="0"
+                Width="448">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="Filters"
+                               Foreground="White"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Margin="0,0,0,8" />
+                    
+                    <TextBlock Text="NSFW Filter:"
+                               Foreground="White"
+                               FontSize="12"
+                               Margin="0,0,0,4" />
+                    <ComboBox x:Name="NsfwFilterCombo"
+                              SelectedIndex="0"
+                              SelectionChanged="OnNsfwFilterChanged"
+                              Margin="0,0,0,12">
+                        <ComboBoxItem Content="All" Tag="All" />
+                        <ComboBoxItem Content="No NSFW" Tag="NoNsfw" />
+                        <ComboBoxItem Content="NSFW Only" Tag="NsfwOnly" />
+                    </ComboBox>
+
+                    <TextBlock Text="Object Filter:"
+                               Foreground="White"
+                               FontSize="12"
+                               Margin="0,0,0,4" />
+                    <ComboBox x:Name="ObjectFilterCombo"
+                              SelectedIndex="0"
+                              SelectionChanged="OnObjectFilterChanged"
+                              Margin="0,0,0,4">
+                        <ComboBoxItem Content="Show All" Tag="ShowAll" />
+                        <ComboBoxItem Content="Show Only" Tag="ShowOnly" />
+                        <ComboBoxItem Content="Exclude" Tag="Exclude" />
+                    </ComboBox>
+                    <TextBox x:Name="ObjectFilterText"
+                             TextChanged="OnObjectFilterTextChanged"
+                             Margin="0,0,0,12"
+                             Padding="4"
+                             Background="#33000000"
+                             Foreground="White"
+                             BorderBrush="#66FFFFFF"
+                             BorderThickness="1" />
+
+                    <Button Content="Apply Filters"
+                            Click="OnApplyFiltersClick"
+                            Padding="8,4"
+                            Background="#44000000"
+                            Foreground="White"
+                            BorderBrush="#66FFFFFF"
+                            BorderThickness="1"
+                            Cursor="Hand"
+                            Margin="0,0,0,16" />
+                    
+                    <!-- Analysis Tools Section -->
+                    <Separator Background="#44FFFFFF" Margin="0,0,0,16" />
+                    
+                    <TextBlock Text="Analysis Tools"
+                               Foreground="White"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Margin="0,0,0,8" />
+                    
+                    <Button Content="Check NSFW"
+                            Click="OnCheckNsfwClick"
+                            Padding="8,4"
+                            Background="#44000000"
+                            Foreground="White"
+                            BorderBrush="#66FFFFFF"
+                            BorderThickness="1"
+                            Cursor="Hand"
+                            Margin="0,0,0,8" />
+                    
+                    <Button Content="Run Object Detection"
+                            Click="OnRunObjectDetectionClick"
+                            Padding="8,4"
+                            Background="#44000000"
+                            Foreground="White"
+                            BorderBrush="#66FFFFFF"
+                            BorderThickness="1"
+                            Cursor="Hand"
+                            Margin="0,0,0,8" />
+                    
+                    <TextBlock Text="Search for object:"
+                               Foreground="White"
+                               FontSize="12"
+                               Margin="0,0,0,4" />
+                    <TextBox x:Name="ObjectSearchText"
+                             Margin="0,0,0,8"
+                             Padding="4"
+                             Background="#33000000"
+                             Foreground="White"
+                             BorderBrush="#66FFFFFF"
+                             BorderThickness="1" />
+                    
+                    <Button Content="Search Object"
+                            Click="OnSearchObjectClick"
+                            Padding="8,4"
+                            Background="#44000000"
+                            Foreground="White"
+                            BorderBrush="#66FFFFFF"
+                            BorderThickness="1"
+                            Cursor="Hand"
+                            Margin="0,0,0,12" />
+                    
+                    <!-- Detection Results Display -->
+                    <Border x:Name="DetectionResultsPanel"
+                            Background="#22FFFFFF"
+                            CornerRadius="4"
+                            Padding="12"
+                            Visibility="Collapsed"
+                            Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock Text="Detection Results"
+                                       Foreground="White"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Margin="0,0,0,12" />
+                            
+                            <!-- NSFW Results -->
+                            <StackPanel x:Name="NsfwResultsPanel" Visibility="Collapsed">
+                                <TextBlock Text="NSFW Analysis:"
+                                           Foreground="#CCFFFFFF"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,8" />
+                                <Border x:Name="NsfwResultBadge"
+                                        Background="#FF4444"
+                                        CornerRadius="4"
+                                        Padding="8,4"
+                                        Margin="0,0,0,4"
+                                        HorizontalAlignment="Left">
+                                    <TextBlock x:Name="NsfwResultText"
+                                               Text="NSFW"
+                                               Foreground="White"
+                                               FontSize="14"
+                                               FontWeight="Bold" />
+                                </Border>
+                                <TextBlock x:Name="NsfwConfidenceText"
+                                           Text="Confidence: 95.3%"
+                                           Foreground="#AAFFFFFF"
+                                           FontSize="12"
+                                           Margin="0,4,0,12" />
+                            </StackPanel>
+                            
+                            <!-- Object Detection Results -->
+                            <StackPanel x:Name="ObjectResultsPanel" Visibility="Collapsed">
+                                <TextBlock Text="Detected Objects:"
+                                           Foreground="#CCFFFFFF"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,8" />
+                                <ItemsControl x:Name="ObjectTagsList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#22FFFFFF"
+                                                    CornerRadius="4"
+                                                    Padding="8,6"
+                                                    Margin="0,0,0,4">
+                                                <TextBlock Foreground="White"
+                                                           FontSize="13"
+                                                           VerticalAlignment="Center">
+                                                    <Run Text="{Binding Rank, Mode=OneWay}"
+                                                         Foreground="#99FFFFFF"
+                                                         FontWeight="Bold"
+                                                         FontSize="11" /><Run Text=". " Foreground="#99FFFFFF" /><Run Text="{Binding Name, Mode=OneWay}"
+                                                         FontWeight="Medium" /><Run Text=": " /><Run Text="{Binding ConfidencePercent, Mode=OneWay}"
+                                                         Foreground="#EEFFFFFF"
+                                                         FontWeight="SemiBold" />
+                                                </TextBlock>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Keyboard Shortcuts Overlay -->
         <Border x:Name="ShortcutsOverlay"
-                CornerRadius="12"
-                Padding="28"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
+                Background="#DD000000"
                 Visibility="Collapsed"
                 Opacity="0">
-            <Border.Background>
-                <StaticResource ResourceKey="ShortcutOverlayBackground" />
-            </Border.Background>
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="24"
-                                  ShadowDepth="0"
-                                  Opacity="0.6" />
-            </Border.Effect>
-            <StackPanel>
-                <StackPanel Margin="0,0,0,20">
-                    <TextBlock Text="Keyboard Shortcuts"
-                               Foreground="White"
-                               FontSize="22"
-                               FontWeight="Bold"
-                               Opacity="0.95"
-                               Margin="0,0,0,4" />
-                    <TextBlock Text="Stay in flow with these quick commands, including one-touch archiving."
-                               Foreground="#CCFFFFFF"
-                               FontSize="13" />
-                </StackPanel>
-                <UniformGrid Columns="2">
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="Space / Right / Down"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Next image"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="Backspace / Left / Up"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Previous image"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="Home / End"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Jump to first or last"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="= / -"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Zoom in or out"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="&#92;"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Reset zoom"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="Arrow keys (zoomed)"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Pan image"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="Ctrl+Shift+Arrow keys"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Jump halfway through the list"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="Mouse wheel"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Previous / next image"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="F11 / Double-click"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Toggle fullscreen"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="A"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Archive to old folder"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="Ctrl+Z or U"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Undo last archive"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="I"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Toggle metadata overlay"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ShortcutCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="/ or ?"
-                                       Style="{StaticResource ShortcutKeyStyle}" />
-                            <TextBlock Text="Toggle this list"
-                                       Style="{StaticResource ShortcutDescriptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                </UniformGrid>
-                <TextBlock Text="Press A to move the current file into an automatically managed 'old' folder without overwriting existing archives."
-                           Foreground="#CCFFFFFF"
-                           FontSize="13"
-                           TextWrapping="Wrap"
-                           Margin="0,16,0,0" />
-                <TextBlock Text="Press Esc to close."
-                           Foreground="#99FFFFFF"
-                           FontSize="12"
-                           Margin="0,12,0,0"
-                           HorizontalAlignment="Right" />
-            </StackPanel>
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <Border Background="#E8000000"
+                        CornerRadius="8"
+                        Padding="24"
+                        Margin="80,40"
+                        MaxWidth="800"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="Keyboard Shortcuts"
+                                   Foreground="White"
+                                   FontSize="24"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,20"
+                                   HorizontalAlignment="Center" />
+
+                        <!-- Navigation Section -->
+                        <TextBlock Text="Navigation"
+                                   Foreground="#FFD700"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,12" />
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Right / Down / Space" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Next image" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Left / Up / Backspace" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Previous image" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Home" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Jump to first image" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="End" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="Jump to last image" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+Shift+Arrow" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Jump halfway toward start/end (quadratic navigation)" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Mouse Wheel" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="5" Grid.Column="1" Text="Navigate images (when not zoomed)" Foreground="White" Margin="0,0,0,8" />
+                        </Grid>
+
+                        <!-- Zoom & Pan Section -->
+                        <TextBlock Text="Zoom &amp; Pan"
+                                   Foreground="#FFD700"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,8,0,12" />
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="= / +" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Zoom in" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="-" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Zoom out" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="\" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Reset zoom to fit" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Arrow Keys / Mouse Drag" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="Pan image (when zoomed)" Foreground="White" Margin="0,0,0,8" />
+                        </Grid>
+
+                        <!-- File Operations Section -->
+                        <TextBlock Text="File Operations"
+                                   Foreground="#FFD700"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,8,0,12" />
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="A" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Archive current image to 'old' subfolder" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="U / Ctrl+Z" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Undo last archive operation" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl+O" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Open file dialog to load an image" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+C" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="Copy current image to clipboard" Foreground="White" Margin="0,0,0,8" />
+                        </Grid>
+
+                        <!-- Interface Section -->
+                        <TextBlock Text="Interface"
+                                   Foreground="#FFD700"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,8,0,12" />
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="I" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Toggle metadata overlay" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="F" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Toggle filter panel" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="/ or ?" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Toggle keyboard shortcuts (this overlay)" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="F11 / Double-Click" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="Toggle fullscreen mode" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+R" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Reload config.json" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+S / Ctrl+," Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="5" Grid.Column="1" Text="Open settings window" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Right-Click" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="6" Grid.Column="1" Text="Open sort menu and copy path" Foreground="White" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="Escape" Foreground="#B0B0B0" Margin="0,0,0,8" FontFamily="Consolas" />
+                            <TextBlock Grid.Row="7" Grid.Column="1" Text="Exit fullscreen or close application" Foreground="White" Margin="0,0,0,8" />
+                        </Grid>
+
+                        <Border Background="#33FFFFFF"
+                                CornerRadius="4"
+                                Padding="12"
+                                Margin="0,8,0,0">
+                            <TextBlock Foreground="#CCFFFFFF"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Text="Press / or ? again, or Escape to close this overlay." />
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
         </Border>
 
         <TextBlock x:Name="MessageBlock"
