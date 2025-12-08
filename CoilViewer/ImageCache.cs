@@ -3,7 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using SharpVectors.Converters;
+using SharpVectors.Renderers.Wpf;
 
 namespace CoilViewer;
 
@@ -93,6 +97,19 @@ internal sealed class ImageCache
         var path = _sequence[index];
         Logger.Log($"[IMAGECACHE] Get path from sequence: {stepTimer.ElapsedMilliseconds}ms");
 
+        // Check if this is an SVG file
+        if (Path.GetExtension(path).Equals(".svg", StringComparison.OrdinalIgnoreCase))
+        {
+            stepTimer.Restart();
+            var bitmap = LoadSvgBitmap(path);
+            Logger.Log($"[IMAGECACHE] LoadSvgBitmap: {stepTimer.ElapsedMilliseconds}ms");
+            
+            totalTimer.Stop();
+            Logger.Log($"[IMAGECACHE] ========== TOTAL LOADBITMAP TIME for '{Path.GetFileName(path)}' (SVG): {totalTimer.ElapsedMilliseconds}ms ==========");
+            
+            return bitmap;
+        }
+
         stepTimer.Restart();
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         Logger.Log($"[IMAGECACHE] Open FileStream for '{Path.GetFileName(path)}': {stepTimer.ElapsedMilliseconds}ms");
@@ -113,6 +130,89 @@ internal sealed class ImageCache
         Logger.Log($"[IMAGECACHE] ========== TOTAL LOADBITMAP TIME for '{Path.GetFileName(path)}': {totalTimer.ElapsedMilliseconds}ms ==========");
         
         return frame;
+    }
+
+    private static BitmapSource LoadSvgBitmap(string path)
+    {
+        // Configure SVG rendering settings
+        var settings = new WpfDrawingSettings
+        {
+            IncludeRuntime = true,
+            TextAsGeometry = false,
+            OptimizePath = true
+        };
+
+        using var reader = new FileSvgReader(settings);
+        var drawing = reader.Read(path);
+
+        if (drawing == null)
+        {
+            throw new InvalidOperationException($"Failed to load SVG file: {path}");
+        }
+
+        // Get the natural size of the SVG
+        var bounds = drawing.Bounds;
+        double width = bounds.Width;
+        double height = bounds.Height;
+
+        // If the SVG has no valid size, use a default
+        if (width <= 0 || height <= 0)
+        {
+            width = 1024;
+            height = 1024;
+        }
+
+        // Scale up small SVGs for better quality, cap large ones to avoid memory issues
+        const double MinSize = 512;
+        const double MaxSize = 4096;
+
+        double scale = 1.0;
+        double maxDimension = Math.Max(width, height);
+        double minDimension = Math.Min(width, height);
+
+        if (maxDimension < MinSize)
+        {
+            scale = MinSize / maxDimension;
+        }
+        else if (maxDimension > MaxSize)
+        {
+            scale = MaxSize / maxDimension;
+        }
+
+        int renderWidth = (int)Math.Ceiling(width * scale);
+        int renderHeight = (int)Math.Ceiling(height * scale);
+
+        // Create a DrawingVisual to render the SVG
+        var drawingVisual = new DrawingVisual();
+        using (var drawingContext = drawingVisual.RenderOpen())
+        {
+            // Apply scaling transform if needed
+            if (Math.Abs(scale - 1.0) > 0.001)
+            {
+                drawingContext.PushTransform(new ScaleTransform(scale, scale));
+            }
+
+            // Translate to handle SVG origin offset
+            if (bounds.X != 0 || bounds.Y != 0)
+            {
+                drawingContext.PushTransform(new TranslateTransform(-bounds.X, -bounds.Y));
+            }
+
+            drawingContext.DrawDrawing(drawing);
+        }
+
+        // Render to bitmap at 96 DPI
+        var renderBitmap = new RenderTargetBitmap(
+            renderWidth,
+            renderHeight,
+            96,
+            96,
+            PixelFormats.Pbgra32);
+
+        renderBitmap.Render(drawingVisual);
+        renderBitmap.Freeze();
+
+        return renderBitmap;
     }
 
     private void Trim(int centerIndex)

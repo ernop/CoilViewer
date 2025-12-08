@@ -10,7 +10,7 @@ internal sealed class ImageSequence
 {
     private static readonly string[] SupportedExtensions =
     {
-        ".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".bmp", ".dib", ".gif", ".tiff", ".tif", ".webp"
+        ".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".bmp", ".dib", ".gif", ".tiff", ".tif", ".webp", ".svg"
     };
 
     private static bool IsSupportedExtension(string extension)

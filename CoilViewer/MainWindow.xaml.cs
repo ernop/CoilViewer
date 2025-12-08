@@ -903,7 +903,7 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "Image Files|*.png;*.jpg;*.jpeg;*.jpe;*.jfif;*.bmp;*.dib;*.gif;*.tiff;*.tif;*.webp|All Files|*.*"
+            Filter = "Image Files|*.png;*.jpg;*.jpeg;*.jpe;*.jfif;*.bmp;*.dib;*.gif;*.tiff;*.tif;*.webp;*.svg|All Files|*.*"
         };
 
         if (dialog.ShowDialog() == true)
