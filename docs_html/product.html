@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>product</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+<style>
+
+:root {
+    --bg: #ffffff;
+    --bg-subtle: #f8f9fa;
+    --bg-code: #f4f4f4;
+    --text: #212529;
+    --text-muted: #6c757d;
+    --accent: #0d6efd;
+    --accent-hover: #0a58ca;
+    --border: #dee2e6;
+    --link-visited: #6610f2;
+    --success: #198754;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    background: var(--bg);
+    color: var(--text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+    line-height: 1.2;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    color: var(--text);
+}
+
+h1 {
+    font-size: 2.25rem;
+    font-weight: 300;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+h2 {
+    font-size: 1.75rem;
+    font-weight: 400;
+}
+
+h3 {
+    font-size: 1.375rem;
+}
+
+h4 { font-size: 1.125rem; }
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+a:visited {
+    color: var(--link-visited);
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875em;
+    background: var(--bg-code);
+    color: #d63384;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+}
+
+pre {
+    background: var(--bg-code);
+    padding: 1rem;
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin: 1rem 0;
+}
+
+pre code {
+    padding: 0;
+    background: none;
+    color: var(--text);
+    font-size: 0.875rem;
+}
+
+blockquote {
+    border-left: 4px solid var(--accent);
+    margin: 1rem 0;
+    padding: 0.5rem 1rem;
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+}
+
+blockquote p {
+    margin: 0;
+}
+
+ul, ol {
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+}
+
+li {
+    margin-bottom: 0.25rem;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+}
+
+th, td {
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    text-align: left;
+}
+
+th {
+    background: var(--bg-subtle);
+    font-weight: 600;
+}
+
+tr:nth-child(even) {
+    background: var(--bg-subtle);
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+/* Navigation */
+.docweave-nav {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.back-to-root {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: all 0.15s ease-in-out;
+}
+
+.back-to-root:hover {
+    background: var(--accent);
+    color: white;
+    text-decoration: none;
+    border-color: var(--accent);
+}
+
+/* Footer */
+.docweave-footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.backlinks {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-subtle);
+    border-radius: 4px;
+}
+
+.backlinks strong {
+    color: var(--text);
+}
+
+.backlinks a {
+    color: var(--accent);
+}
+
+.docweave-credit {
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    body {
+        padding: 1rem;
+    }
+    
+    h1 { font-size: 1.75rem; }
+    h2 { font-size: 1.5rem; }
+    
+    table {
+        font-size: 0.875rem;
+    }
+    
+    th, td {
+        padding: 0.5rem;
+    }
+}
+
+</style>
+</head>
+<body>
+<nav class="docweave-nav">
+<a href="index.html" class="back-to-root">Back to CoilViewer</a>
+</nav>
+<header id="title-block-header">
+<h1 class="title">product</h1>
+</header>
+<ul>
+<li><p>Meta: whenever you fulfill a new user-visible requirement, append a concise bullet about it here.</p></li>
+<li><p>The program bumps a global build counter on every build so the version reads 0.000N.</p></li>
+<li><p>The window title shows "coilviewer" followed by that current build version.</p></li>
+<li><p>The viewer accepts an optional command-line argument, resolves it against the file system (including environment variables), and loads that folder or image on startup. Double-clicking an image file also opens it in CoilViewer.</p></li>
+<li><p>The program supports PNG, JPEG, GIF, BMP/DIB, TIFF, and WebP files via Windows Imaging Component.</p></li>
+<li><p>The program lists every image in the chosen folder and moves between them instantly.</p></li>
+<li><p>The overlay presents the active sort mode and the key metadata for the displayed image.</p></li>
+<li><p>The program sorts images by filename, creation time, modification time, or size in ascending or descending order.</p></li>
+<li><p>Right-click opens a sort menu that updates the config and reflects the current sort choice.</p></li>
+<li><p>The program lets Space, Backspace, and the arrow keys move to the next or previous image.</p></li>
+<li><p>Home jumps to the first image and End jumps to the last image in the sequence.</p></li>
+<li><p>F11 and a double-click toggle fullscreen mode on and off.</p></li>
+<li><p>Ctrl+O opens an image and loads its folder; drag and drop does the same.</p></li>
+<li><p>Ctrl+R reloads the JSON config without restarting; menu changes save back to the same file.</p></li>
+<li><p>The config file controls preload radius, cache size, background color, fit/scaling mode, overlay visibility, loop behavior, and default sort.</p></li>
+<li><p>The program preloads neighboring images so navigation remains instant.</p></li>
+<li><p>The "I" key toggles the metadata overlay with a gentle fade.</p></li>
+<li><p>"/" or "?" toggles a keyboard shortcut list that can be dismissed quickly.</p></li>
+<li><p>"=" (or Shift+=) zooms in, "-" zooms out, and zoom resets when a new image loads.</p></li>
+<li><p>"" resets zoom to the fitted scale without disturbing navigation.</p></li>
+<li><p>When zoomed, the arrow keys and mouse wheel pan the image smoothly.</p></li>
+<li><p>When not zoomed, the mouse wheel navigates to the previous or next image.</p></li>
+<li><p>The shortcuts overlay highlights the "A" key for automatically archiving the current image into the "old" folder.</p></li>
+<li><p>Mouse drag pans the zoomed image while leaving image navigation unchanged.</p></li>
+<li><p>Pressing "A" moves the current image into an "old" subfolder, auto-renaming to avoid collisions, and immediately displays the next image without delay.</p></li>
+<li><p>Launch and error details are written to <code>coilviewer-launch.log</code> and <code>coilviewer-errors.log</code> near the project root.</p></li>
+<li><p>Never use fancy quotes; use ASCII quotes only.</p></li>
+<li><p>Never use emojis in any output.</p></li>
+<li><p>Ctrl+Shift+Arrow keys jump halfway toward the start or end of the image list for rapid exploration.</p></li>
+<li><p>Optional AI-powered filtering: Press "F" to open the filter panel. NSFW filter supports "All", "No NSFW", or "NSFW Only" modes. Object filter supports text-based filtering (e.g., "cat", "pizza") with "Show All", "Show Only", or "Exclude" modes. Both filters require explicit enablement in config.json and model files; detection runs only when enabled and models are present. Filters apply to the image sequence and can be combined.</p></li>
+<li><p>Comprehensive startup timing instrumentation logs every initialization step to coilviewer-launch.log, breaking down App startup, MainWindow construction, image sequence loading, and bitmap decoding with millisecond precision.</p></li>
+<li><p>ML model initialization runs asynchronously in the background to avoid blocking window display and first-image rendering.</p></li>
+<li><p>DirectoryInstanceGuard cold-start optimization reduced startup overhead by 40 percent, bringing typical launch time to under 550ms from click to displayed image.</p></li>
+<li><p>Lazy-loaded XAML elements removed 270+ lines of unused UI markup from startup parsing, cutting InitializeComponent time by 10-15 percent.</p></li>
+<li><p>ReadyToRun compilation enabled for Release builds pre-compiles IL to native code, eliminating JIT overhead and reducing startup time by 30-80ms.</p></li>
+<li><p>Tiered compilation with QuickJit ensures debug builds start quickly while allowing the runtime to optimize hot paths during execution.</p></li>
+</ul>
+<footer class="docweave-footer">
+<div class="backlinks">
+<strong>Referenced by:</strong> 
+<a href="index.html">CoilViewer</a>
+</div>
+<div class="docweave-credit">Generated by docweave</div>
+</footer>
+</body>
+</html>

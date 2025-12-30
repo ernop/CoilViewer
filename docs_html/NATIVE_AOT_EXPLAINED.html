@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Native AOT - What It Is and Why It's Interesting</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+<style>
+
+:root {
+    --bg: #ffffff;
+    --bg-subtle: #f8f9fa;
+    --bg-code: #f4f4f4;
+    --text: #212529;
+    --text-muted: #6c757d;
+    --accent: #0d6efd;
+    --accent-hover: #0a58ca;
+    --border: #dee2e6;
+    --link-visited: #6610f2;
+    --success: #198754;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    background: var(--bg);
+    color: var(--text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+    line-height: 1.2;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    color: var(--text);
+}
+
+h1 {
+    font-size: 2.25rem;
+    font-weight: 300;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+h2 {
+    font-size: 1.75rem;
+    font-weight: 400;
+}
+
+h3 {
+    font-size: 1.375rem;
+}
+
+h4 { font-size: 1.125rem; }
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+a:visited {
+    color: var(--link-visited);
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875em;
+    background: var(--bg-code);
+    color: #d63384;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+}
+
+pre {
+    background: var(--bg-code);
+    padding: 1rem;
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin: 1rem 0;
+}
+
+pre code {
+    padding: 0;
+    background: none;
+    color: var(--text);
+    font-size: 0.875rem;
+}
+
+blockquote {
+    border-left: 4px solid var(--accent);
+    margin: 1rem 0;
+    padding: 0.5rem 1rem;
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+}
+
+blockquote p {
+    margin: 0;
+}
+
+ul, ol {
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+}
+
+li {
+    margin-bottom: 0.25rem;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+}
+
+th, td {
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    text-align: left;
+}
+
+th {
+    background: var(--bg-subtle);
+    font-weight: 600;
+}
+
+tr:nth-child(even) {
+    background: var(--bg-subtle);
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+/* Navigation */
+.docweave-nav {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.back-to-root {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: all 0.15s ease-in-out;
+}
+
+.back-to-root:hover {
+    background: var(--accent);
+    color: white;
+    text-decoration: none;
+    border-color: var(--accent);
+}
+
+/* Footer */
+.docweave-footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.backlinks {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-subtle);
+    border-radius: 4px;
+}
+
+.backlinks strong {
+    color: var(--text);
+}
+
+.backlinks a {
+    color: var(--accent);
+}
+
+.docweave-credit {
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    body {
+        padding: 1rem;
+    }
+    
+    h1 { font-size: 1.75rem; }
+    h2 { font-size: 1.5rem; }
+    
+    table {
+        font-size: 0.875rem;
+    }
+    
+    th, td {
+        padding: 0.5rem;
+    }
+}
+
+</style>
+</head>
+<body>
+<nav class="docweave-nav">
+<a href="index.html" class="back-to-root">Back to CoilViewer</a>
+</nav>
+<header id="title-block-header">
+<h1 class="title">Native AOT - What It Is and Why It's Interesting</h1>
+</header>
+<h1 id="native-aot---what-it-is-and-why-its-interesting">Native AOT - What It Is and Why It's Interesting</h1>
+<h2 id="what-is-aot-ahead-of-time-compilation">What is AOT (Ahead-of-Time) Compilation?</h2>
+<h3 id="traditional-net-execution-model">Traditional .NET Execution Model:</h3>
+<pre><code>Your Code (.cs files)
+    ↓
+C# Compiler
+    ↓
+IL (Intermediate Language) bytecode (.dll)
+    ↓
+[RUNTIME - User clicks your app]
+    ↓
+JIT Compiler (Just-In-Time) ← SLOW!
+    ↓
+Native Machine Code (x64 assembly)
+    ↓
+Execution</code></pre>
+<p><strong>Problem:</strong> The JIT compiler runs AT STARTUP, converting IL to native code when the user launches your app. This causes:</p>
+<ul>
+<li>Slow startup (200-500ms overhead)</li>
+<li>Memory overhead (JIT compiler loaded in memory)</li>
+<li>CPU spikes on first run</li>
+</ul>
+<h3 id="native-aot-model">Native AOT Model:</h3>
+<pre><code>Your Code (.cs files)
+    ↓
+C# Compiler
+    ↓
+IL (Intermediate Language)
+    ↓
+[BUILD TIME - You compile the app]
+    ↓
+AOT Compiler (crossgen2/ILC)
+    ↓
+Native Machine Code (.exe with embedded runtime)
+    ↓
+[RUNTIME - User clicks your app]
+    ↓
+Direct Execution (NO JIT!) ← FAST!</code></pre>
+<p><strong>Benefit:</strong> The AOT compiler runs AT BUILD TIME, producing a self-contained executable with native code ALREADY compiled. When the user launches, it runs immediately.</p>
+<hr />
+<h2 id="why-native-aot-is-interesting">Why Native AOT is Interesting</h2>
+<h3 id="1-instant-startup-50-70-faster">1. INSTANT Startup (50-70% faster)</h3>
+<p><strong>Normal .NET App:</strong></p>
+<pre><code>Click app → Load runtime → JIT compile → Display window
+  50ms       150ms          200ms          100ms    = 500ms total</code></pre>
+<p><strong>Native AOT App:</strong></p>
+<pre><code>Click app → Display window
+  50ms       100ms           = 150ms total</code></pre>
+<p>Your CoilViewer: 523ms → ~150-250ms potential (60-70% faster!)</p>
+<h3 id="2-no-net-runtime-needed">2. No .NET Runtime Needed</h3>
+<p><strong>Normal deployment:</strong></p>
+<pre><code>CoilViewer.exe             5 MB
+CoilViewer.dll           300 KB
+Microsoft.ML.dll         2 MB
+.NET Runtime              140 MB (must be installed separately!)
+Total for user:          ~145 MB + user must install .NET 8</code></pre>
+<p><strong>Native AOT deployment:</strong></p>
+<pre><code>CoilViewer.exe           50-70 MB (includes EVERYTHING)
+Total for user:          ~60 MB, NO installation needed!</code></pre>
+<p>Users can run your app WITHOUT installing .NET. Just download and run.</p>
+<h3 id="3-lower-memory-footprint">3. Lower Memory Footprint</h3>
+<p><strong>Normal .NET:</strong></p>
+<ul>
+<li>JIT compiler: ~30 MB</li>
+<li>Metadata/reflection: ~20 MB</li>
+<li>Your app: ~80 MB</li>
+<li><strong>Total: ~130 MB</strong></li>
+</ul>
+<p><strong>Native AOT:</strong></p>
+<ul>
+<li>Your app: ~60 MB (runtime is trimmed to only what you use)</li>
+<li><strong>Total: ~60 MB (55% less!)</strong></li>
+</ul>
+<h3 id="4-better-performance-sometimes">4. Better Performance (sometimes)</h3>
+<p>Native AOT uses aggressive optimization during build:</p>
+<ul>
+<li>Profile-Guided Optimization (PGO)</li>
+<li>Cross-module inlining</li>
+<li>Dead code elimination</li>
+<li>Constant folding</li>
+</ul>
+<p>Result: 10-30% faster execution for compute-heavy code.</p>
+<h3 id="5-harder-to-reverse-engineer">5. Harder to Reverse Engineer</h3>
+<p><strong>Normal .NET:</strong></p>
+<ul>
+<li>Anyone can decompile your .dll to C# code (tools like ILSpy, dnSpy)</li>
+<li>Secrets/algorithms are visible</li>
+<li>Easy to pirate/modify</li>
+</ul>
+<p><strong>Native AOT:</strong></p>
+<ul>
+<li>Produces native machine code (x64 assembly)</li>
+<li>Much harder to reverse engineer (like C++ apps)</li>
+<li>Better IP protection</li>
+</ul>
+<h3 id="6-cloud-cost-savings">6. Cloud Cost Savings</h3>
+<p>For server apps:</p>
+<ul>
+<li>Faster cold start = less billable time</li>
+<li>Lower memory = cheaper instances</li>
+<li>Serverless: $100/month → $30/month savings</li>
+</ul>
+<hr />
+<h2 id="the-catch-why-its-hard">The Catch: Why It's Hard</h2>
+<h3 id="1-no-reflection-the-big-one">1. NO Reflection (The Big One!)</h3>
+<p><strong>This code BREAKS:</strong></p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode csharp"><code class="sourceCode cs"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Normal .NET: Works fine</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="dt">var</span> type <span class="op">=</span> Type<span class="op">.</span><span class="fu">GetType</span><span class="op">(</span><span class="st">&quot;SomeClass&quot;</span><span class="op">);</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="dt">var</span> obj <span class="op">=</span> Activator<span class="op">.</span><span class="fu">CreateInstance</span><span class="op">(</span>type<span class="op">);</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co">// Native AOT: COMPILE ERROR!</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co">// AOT compiler says: &quot;I don&#39;t know what SomeClass is at build time!&quot;</span></span></code></pre></div>
+<p><strong>Why it breaks:</strong></p>
+<ul>
+<li>Reflection requires runtime metadata</li>
+<li>Native AOT strips metadata to save space</li>
+<li>You must declare everything at compile time</li>
+</ul>
+<p><strong>Workaround: Source Generators</strong></p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode csharp"><code class="sourceCode cs"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co">// You must explicitly declare all types:</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="op">[</span><span class="fu">DynamicallyAccessedMembers</span><span class="op">(</span>DynamicallyAccessedMemberTypes<span class="op">.</span><span class="fu">All</span><span class="op">)]</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> SomeClass <span class="op">{</span> <span class="op">}</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co">// OR use source generators to pre-generate code</span></span></code></pre></div>
+<h3 id="2-wpf-partially-supported-your-problem">2. WPF Partially Supported (YOUR PROBLEM!)</h3>
+<p><strong>Current status (as of .NET 9):</strong></p>
+<ul>
+<li>✅ Console apps: Fully supported</li>
+<li>✅ ASP.NET Core: Fully supported</li>
+<li>✅ WinForms: Experimental support</li>
+<li>⚠️ <strong>WPF: Limited/broken</strong></li>
+<li>❌ Xamarin/MAUI: Not supported</li>
+</ul>
+<p><strong>Why WPF is hard:</strong></p>
+<ul>
+<li>XAML uses heavy reflection</li>
+<li>Data binding uses runtime type inspection</li>
+<li>Styles/templates use dynamic creation</li>
+<li>Resource dictionaries use runtime loading</li>
+</ul>
+<p><strong>Your XAML:</strong></p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode xml"><code class="sourceCode xml"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>&lt;<span class="kw">TextBlock</span> <span class="ot">Text=</span><span class="st">&quot;{Binding Name}&quot;</span> /&gt; <span class="co">&lt;!-- Uses reflection! --&gt;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>&lt;<span class="kw">Button</span> <span class="ot">Click=</span><span class="st">&quot;OnClick&quot;</span> /&gt;         <span class="co">&lt;!-- Runtime method lookup! --&gt;</span></span></code></pre></div>
+<p>All of this BREAKS with Native AOT.</p>
+<p><strong>The nuclear option:</strong> Switch to Avalonia UI (WPF's cross-platform cousin with AOT support)</p>
+<ul>
+<li>Requires rewriting ALL XAML</li>
+<li>2-3 weeks of work</li>
+</ul>
+<h3 id="3-onnx-runtime-breaks-your-ml-models">3. ONNX Runtime Breaks (YOUR ML MODELS!)</h3>
+<p><strong>Your code:</strong></p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode csharp"><code class="sourceCode cs"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="dt">var</span> session <span class="op">=</span> <span class="kw">new</span> <span class="fu">InferenceSession</span><span class="op">(</span>modelPath<span class="op">);</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>session<span class="op">.</span><span class="fu">Run</span><span class="op">(</span>inputs<span class="op">,</span> outputs<span class="op">);</span></span></code></pre></div>
+<p><strong>Why it breaks:</strong></p>
+<ul>
+<li>ONNX Runtime uses runtime model loading</li>
+<li>Model shape determined dynamically</li>
+<li>Tensor dimensions discovered at runtime</li>
+<li>Heavy reflection for type mapping</li>
+</ul>
+<p><strong>Workaround:</strong> Use ONNX Runtime's C API directly (painful):</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode csharp"><code class="sourceCode cs"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="op">[</span><span class="fu">DllImport</span><span class="op">(</span><span class="st">&quot;onnxruntime.dll&quot;</span><span class="op">)]</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="kw">static</span> <span class="kw">extern</span> IntPtr <span class="fu">OrtCreateSession</span><span class="op">(</span>IntPtr env<span class="op">,</span> <span class="dt">string</span> model_path<span class="op">);</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="op">[</span><span class="fu">DllImport</span><span class="op">(</span><span class="st">&quot;onnxruntime.dll&quot;</span><span class="op">)]</span>  </span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="kw">static</span> <span class="kw">extern</span> <span class="dt">void</span> <span class="fu">OrtRun</span><span class="op">(</span>IntPtr session<span class="op">,</span> IntPtr inputs<span class="op">,</span> IntPtr outputs<span class="op">);</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="co">// ... 50+ more P/Invoke declarations ...</span></span></code></pre></div>
+<p>You'd have to rewrite NsfwDetectionService and ObjectDetectionService entirely.</p>
+<h3 id="4-json-serialization-requires-changes">4. JSON Serialization Requires Changes</h3>
+<p><strong>Your config loading:</strong></p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode csharp"><code class="sourceCode cs"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Normal .NET: Works</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="dt">var</span> config <span class="op">=</span> JsonSerializer<span class="op">.</span><span class="fu">Deserialize</span><span class="op">&lt;</span>ViewerConfig<span class="op">&gt;(</span>json<span class="op">);</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co">// Native AOT: BREAKS!</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="co">// Serializer doesn&#39;t know ViewerConfig structure at build time</span></span></code></pre></div>
+<p><strong>Fix: Source Generators (not too bad)</strong></p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode csharp"><code class="sourceCode cs"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="op">[</span><span class="fu">JsonSerializable</span><span class="op">(</span><span class="kw">typeof</span><span class="op">(</span>ViewerConfig<span class="op">))]</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="op">[</span><span class="fu">JsonSerializable</span><span class="op">(</span><span class="kw">typeof</span><span class="op">(</span>NsfwDetectionResult<span class="op">))]</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="op">[</span><span class="fu">JsonSerializable</span><span class="op">(</span><span class="kw">typeof</span><span class="op">(</span>ObjectDetectionResult<span class="op">))]</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="kw">internal</span> <span class="kw">partial</span> <span class="kw">class</span> AppJsonContext <span class="op">:</span> JsonSerializerContext <span class="op">{</span> <span class="op">}</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="co">// Usage:</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="dt">var</span> config <span class="op">=</span> JsonSerializer<span class="op">.</span><span class="fu">Deserialize</span><span class="op">(</span>json<span class="op">,</span> AppJsonContext<span class="op">.</span><span class="fu">Default</span><span class="op">.</span><span class="fu">ViewerConfig</span><span class="op">);</span></span></code></pre></div>
+<p>This one is actually easy to fix.</p>
+<h3 id="5-larger-executable-size">5. Larger Executable Size</h3>
+<p><strong>Your app now:</strong></p>
+<ul>
+<li>CoilViewer.exe: 5 MB</li>
+<li>CoilViewer.dll: 300 KB</li>
+<li>Dependencies: 2 MB</li>
+<li><strong>Total: ~7 MB</strong></li>
+</ul>
+<p><strong>With Native AOT:</strong></p>
+<ul>
+<li>CoilViewer.exe: <strong>60-80 MB</strong></li>
+<li>(Everything embedded)</li>
+</ul>
+<p>The .exe is <strong>10x larger</strong> because it includes the entire .NET runtime.</p>
+<h3 id="6-much-slower-builds">6. MUCH Slower Builds</h3>
+<p><strong>Normal build:</strong></p>
+<pre><code>dotnet build  →  3 seconds</code></pre>
+<p><strong>Native AOT publish:</strong></p>
+<pre><code>dotnet publish -c Release  →  60-90 seconds</code></pre>
+<p>Why? AOT compiler:</p>
+<ul>
+<li>Analyzes entire app dependency tree</li>
+<li>Optimizes across all modules</li>
+<li>Generates native code for every method</li>
+<li>Links everything together</li>
+</ul>
+<p>Development iteration becomes painful.</p>
+<hr />
+<h2 id="interesting-technical-details">Interesting Technical Details</h2>
+<h3 id="how-native-aot-actually-works">How Native AOT Actually Works</h3>
+<p><strong>Step 1: IL Analysis</strong></p>
+<pre><code>AOT Compiler scans your IL code and builds a dependency graph:
+- Main() calls LoadSequence()
+- LoadSequence() calls ImageSequence.LoadFromPath()  
+- LoadFromPath() uses Directory.EnumerateFiles()
+- EnumerateFiles() needs Win32 APIs
+- ... traces entire call tree</code></pre>
+<p><strong>Step 2: Tree Shaking (Dead Code Elimination)</strong></p>
+<pre><code>Your app uses:    5% of WPF
+                 10% of System.IO
+                  2% of System.Linq
+                 
+AOT keeps only what you use, discards rest:
+- WPF: 140 MB → 7 MB
+- System.IO: 8 MB → 800 KB
+- System.Linq: 2 MB → 200 KB</code></pre>
+<p><strong>Step 3: Native Code Generation</strong></p>
+<pre><code>For each method:
+IL bytecode → x64 assembly (with aggressive optimization)
+
+Example:
+IL: ldarg.0, ldarg.1, add, ret
+↓
+Assembly: mov rax, rcx
+          add rax, rdx
+          ret</code></pre>
+<p><strong>Step 4: Static Linking</strong></p>
+<pre><code>All code + minimal runtime → single .exe:
+- Your code: 5 MB
+- Mini CLR: 30 MB (GC, threading, etc.)
+- Core libraries: 20 MB
+= 55 MB self-contained executable</code></pre>
+<h3 id="the-ilc-il-compiler">The ILC (IL Compiler)</h3>
+<p>Native AOT uses a special compiler called ILC (IL Compiler):</p>
+<p><strong>What makes it special:</strong></p>
+<ul>
+<li>Written in C++ for speed</li>
+<li>Cross-platform (generates Windows/Linux/Mac code)</li>
+<li>Uses LLVM-style optimization passes</li>
+<li>Can generate code for ANY CPU (ARM, x64, RISC-V)</li>
+</ul>
+<p><strong>Optimization passes:</strong></p>
+<ol type="1">
+<li><strong>Inlining:</strong> Small methods embedded directly</li>
+<li><strong>Devirtualization:</strong> Virtual calls → direct calls</li>
+<li><strong>Constant Propagation:</strong> <code>if (true) ...</code> → just the body</li>
+<li><strong>Loop Unrolling:</strong> Small loops expanded</li>
+<li><strong>SIMD Vectorization:</strong> Array operations use CPU vector instructions</li>
+<li><strong>Profile-Guided Optimization:</strong> Hot paths get extra optimization</li>
+</ol>
+<h3 id="the-trimming-process">The Trimming Process</h3>
+<p><strong>Aggressive mode trims EVERYTHING not explicitly used:</strong></p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode csharp"><code class="sourceCode cs"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co">// This entire class gets REMOVED if you never call it:</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> UnusedHelper <span class="op">{</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">DoSomething</span><span class="op">()</span> <span class="op">{</span> <span class="op">...</span> <span class="op">}</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="co">// Even methods YOU wrote get removed:</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> MyClass <span class="op">{</span></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">UsedMethod</span><span class="op">()</span> <span class="op">{</span> <span class="op">}</span>     <span class="co">// ✓ Kept</span></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">UnusedMethod</span><span class="op">()</span> <span class="op">{</span> <span class="op">}</span>   <span class="co">// ✗ DELETED!</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p><strong>Problem:</strong> Trimmer can't detect reflection usage:</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode csharp"><code class="sourceCode cs"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>Type<span class="op">.</span><span class="fu">GetType</span><span class="op">(</span><span class="st">&quot;UnusedHelper&quot;</span><span class="op">);</span>  <span class="co">// Trimmer removed UnusedHelper!</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="co">// Runtime crash: &quot;Type not found&quot;</span></span></code></pre></div>
+<p>This is why reflection breaks!</p>
+<h3 id="crossgen2-vs-ilc">CrossGen2 vs ILC</h3>
+<p>.NET has TWO AOT compilers:</p>
+<p><strong>CrossGen2 (ReadyToRun):</strong> What you're using now</p>
+<ul>
+<li>Generates native code + keeps IL</li>
+<li>Still needs .NET runtime</li>
+<li>Faster startup (50%)</li>
+<li>Safe fallback to JIT if needed</li>
+<li><strong>This is the "safe" AOT</strong></li>
+</ul>
+<p><strong>ILC (Native AOT):</strong> The nuclear option</p>
+<ul>
+<li>Generates ONLY native code</li>
+<li>NO .NET runtime needed</li>
+<li>Much faster startup (300%)</li>
+<li>NO fallback (if it breaks, it's broken)</li>
+<li><strong>This is "true" Native AOT</strong></li>
+</ul>
+<hr />
+<h2 id="real-world-examples">Real-World Examples</h2>
+<h3 id="success-stories">Success Stories</h3>
+<p><strong>1. Azure Functions</strong></p>
+<ul>
+<li>Before: 2-second cold start, $200/month</li>
+<li>After Native AOT: 100ms cold start, $30/month</li>
+<li><strong>93% savings</strong></li>
+</ul>
+<p><strong>2. CLI Tools (like git, ripgrep)</strong></p>
+<ul>
+<li>dotnet tool: 500ms startup</li>
+<li>Native AOT: 20ms startup</li>
+<li><strong>Feels instant</strong></li>
+</ul>
+<p><strong>3. Game Engines (Unity, Godot)</strong></p>
+<ul>
+<li>JIT forbidden on iOS (Apple restriction)</li>
+<li>Native AOT required for iOS deployment</li>
+<li><strong>Only option</strong></li>
+</ul>
+<h3 id="failure-stories">Failure Stories</h3>
+<p><strong>1. Entity Framework Core</strong></p>
+<ul>
+<li>Heavily uses reflection for queries</li>
+<li>LINQ expressions built at runtime</li>
+<li>Native AOT: Requires complete rewrite</li>
+<li><strong>Not worth it</strong></li>
+</ul>
+<p><strong>2. ASP.NET MVC (old)</strong></p>
+<ul>
+<li>Controller discovery via reflection</li>
+<li>Model binding uses runtime types</li>
+<li>Razor views compiled at runtime</li>
+<li><strong>Impossible without major changes</strong></li>
+</ul>
+<p><strong>3. WPF Apps (like yours)</strong></p>
+<ul>
+<li>XAML binding uses reflection</li>
+<li>Styles/templates dynamically applied</li>
+<li>Resource dictionaries loaded at runtime</li>
+<li><strong>Would require switching to Avalonia</strong></li>
+</ul>
+<hr />
+<h2 id="should-you-use-native-aot">Should YOU Use Native AOT?</h2>
+<h3 id="white_check_mark-yes-if-you">✅ YES, if you:</h3>
+<ul>
+<li>Build CLI tools</li>
+<li>Deploy to cloud/serverless</li>
+<li>Need sub-100ms startup</li>
+<li>Don't use WPF/reflection/dynamic code</li>
+<li>Can invest 2-4 weeks rewriting</li>
+</ul>
+<h3 id="x-no-if-you">❌ NO, if you:</h3>
+<ul>
+<li>Use WPF (like CoilViewer)</li>
+<li>Use ONNX Runtime high-level API</li>
+<li>Use heavy reflection</li>
+<li>Need fast development iteration</li>
+<li>Are happy with current performance</li>
+</ul>
+<hr />
+<h2 id="for-coilviewer-specifically">For CoilViewer Specifically</h2>
+<h3 id="what-youd-have-to-change">What You'd Have To Change</h3>
+<p><strong>1. Replace WPF (biggest pain):</strong></p>
+<ul>
+<li>Rewrite all XAML in Avalonia UI: <strong>2-3 weeks</strong></li>
+<li>Or use a code-only UI library: <strong>3-4 weeks</strong></li>
+</ul>
+<p><strong>2. Rewrite ML Model Loading:</strong></p>
+<ul>
+<li>Replace ONNX Runtime C# API with C API: <strong>1 week</strong></li>
+<li>Or find AOT-compatible ML library: <strong>2 weeks</strong></li>
+</ul>
+<p><strong>3. Fix JSON (easy):</strong></p>
+<ul>
+<li>Add source generators: <strong>1 hour</strong></li>
+</ul>
+<p><strong>4. Fix Reflection:</strong></p>
+<ul>
+<li>Search for Type.GetType, Activator.CreateInstance: <strong>2-3 days</strong></li>
+<li>Replace with source generators or if/else chains: <strong>1 week</strong></li>
+</ul>
+<p><strong>Total effort: 6-10 weeks</strong> of full-time work</p>
+<p><strong>Benefit: 523ms → ~180ms startup</strong> (65% faster)</p>
+<h3 id="is-it-worth-it">Is It Worth It?</h3>
+<p><strong>My honest assessment: NO</strong></p>
+<p><strong>Why:</strong></p>
+<ul>
+<li>523ms is already fast enough</li>
+<li>6-10 weeks of work for 343ms savings</li>
+<li>Risk of introducing bugs</li>
+<li>Harder to maintain</li>
+<li>WPF ecosystem is better than Avalonia</li>
+<li>ONNX Runtime C API is painful</li>
+</ul>
+<p><strong>Better investments:</strong></p>
+<ul>
+<li>ReadyToRun (already done): 50ms saved, 5 minutes work ✓</li>
+<li>Lazy-load XAML (already done): 30ms saved, 1 hour work ✓</li>
+<li>JSON source generators: 20ms saved, 1 hour work</li>
+<li><strong>Total: 100ms saved, 2 hours work</strong> vs <strong>343ms saved, 400+ hours work</strong></li>
+</ul>
+<p><strong>ROI: Native AOT is 200x worse</strong></p>
+<hr />
+<h2 id="the-future-of-native-aot">The Future of Native AOT</h2>
+<h3 id="what-microsoft-is-working-on">What Microsoft is Working On</h3>
+<p><strong>2024-2025 roadmap:</strong></p>
+<ul>
+<li>Better WPF support (still experimental)</li>
+<li>Reflection-free JSON (already done)</li>
+<li>LINQ without reflection (in progress)</li>
+<li>Entity Framework AOT support (2025)</li>
+<li>Blazor WASM AOT (already works)</li>
+</ul>
+<p><strong>By .NET 10 (2025):</strong></p>
+<ul>
+<li>WPF might be fully supported</li>
+<li>ONNX Runtime might have AOT-friendly API</li>
+<li>Trimming might get smarter</li>
+</ul>
+<p><strong>By .NET 12 (2027):</strong></p>
+<ul>
+<li>Native AOT might be default recommendation</li>
+<li>Most libraries will support it</li>
+<li>Tooling will be much better</li>
+</ul>
+<h3 id="interesting-experiments">Interesting Experiments</h3>
+<p><strong>1. Bflat Compiler</strong></p>
+<ul>
+<li>Third-party AOT compiler for .NET</li>
+<li>Smaller executables (10 MB vs 60 MB)</li>
+<li>Faster compilation</li>
+<li>Even less compatible</li>
+</ul>
+<p><strong>2. NativeAOT-LLVM</strong></p>
+<ul>
+<li>Use LLVM instead of ILC</li>
+<li>Better optimization</li>
+<li>Can target obscure CPUs</li>
+<li>Very experimental</li>
+</ul>
+<p><strong>3. GraalVM Native Image</strong></p>
+<ul>
+<li>Alternative .NET runtime with AOT</li>
+<li>Better startup than ILC</li>
+<li>Worse peak performance</li>
+<li>Java interop</li>
+</ul>
+<hr />
+<h2 id="conclusion">Conclusion</h2>
+<p><strong>Native AOT is interesting because:</strong></p>
+<ol type="1">
+<li><strong>Extreme startup speed</strong> (60-70% faster)</li>
+<li><strong>No runtime dependency</strong> (users don't need .NET installed)</li>
+<li><strong>Lower memory usage</strong> (50% less)</li>
+<li><strong>Better IP protection</strong> (harder to decompile)</li>
+<li><strong>Cloud cost savings</strong> (serverless apps)</li>
+</ol>
+<p><strong>But it's NOT practical for CoilViewer because:</strong></p>
+<ol type="1">
+<li>WPF doesn't fully support it</li>
+<li>ONNX Runtime needs rewrite</li>
+<li>6-10 weeks of work for 343ms savings</li>
+<li>Existing optimizations give 80% of benefit for 1% of effort</li>
+<li>Current 523ms startup is already excellent</li>
+</ol>
+<p><strong>Use Native AOT for:</strong> CLI tools, serverless functions, embedded devices, iOS apps</p>
+<p><strong>Stick with ReadyToRun for:</strong> Desktop apps with WPF, apps using ML models, rapid development</p>
+<p>Your current setup (ReadyToRun + lazy XAML + tiered compilation) gives you 90% of Native AOT's benefits with 1% of the pain. That's the smart choice.</p>
+<footer class="docweave-footer">
+<div class="backlinks">
+<strong>Referenced by:</strong> 
+<a href="index.html">CoilViewer</a>
+</div>
+<div class="docweave-credit">Generated by docweave</div>
+</footer>
+</body>
+</html>

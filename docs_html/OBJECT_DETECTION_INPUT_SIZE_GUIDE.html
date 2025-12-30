@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Object Detection Input Size Configuration Guide</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+<style>
+
+:root {
+    --bg: #ffffff;
+    --bg-subtle: #f8f9fa;
+    --bg-code: #f4f4f4;
+    --text: #212529;
+    --text-muted: #6c757d;
+    --accent: #0d6efd;
+    --accent-hover: #0a58ca;
+    --border: #dee2e6;
+    --link-visited: #6610f2;
+    --success: #198754;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    background: var(--bg);
+    color: var(--text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+    line-height: 1.2;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    color: var(--text);
+}
+
+h1 {
+    font-size: 2.25rem;
+    font-weight: 300;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+h2 {
+    font-size: 1.75rem;
+    font-weight: 400;
+}
+
+h3 {
+    font-size: 1.375rem;
+}
+
+h4 { font-size: 1.125rem; }
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+a:visited {
+    color: var(--link-visited);
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875em;
+    background: var(--bg-code);
+    color: #d63384;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+}
+
+pre {
+    background: var(--bg-code);
+    padding: 1rem;
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin: 1rem 0;
+}
+
+pre code {
+    padding: 0;
+    background: none;
+    color: var(--text);
+    font-size: 0.875rem;
+}
+
+blockquote {
+    border-left: 4px solid var(--accent);
+    margin: 1rem 0;
+    padding: 0.5rem 1rem;
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+}
+
+blockquote p {
+    margin: 0;
+}
+
+ul, ol {
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+}
+
+li {
+    margin-bottom: 0.25rem;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+}
+
+th, td {
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    text-align: left;
+}
+
+th {
+    background: var(--bg-subtle);
+    font-weight: 600;
+}
+
+tr:nth-child(even) {
+    background: var(--bg-subtle);
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+/* Navigation */
+.docweave-nav {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.back-to-root {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: all 0.15s ease-in-out;
+}
+
+.back-to-root:hover {
+    background: var(--accent);
+    color: white;
+    text-decoration: none;
+    border-color: var(--accent);
+}
+
+/* Footer */
+.docweave-footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.backlinks {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-subtle);
+    border-radius: 4px;
+}
+
+.backlinks strong {
+    color: var(--text);
+}
+
+.backlinks a {
+    color: var(--accent);
+}
+
+.docweave-credit {
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    body {
+        padding: 1rem;
+    }
+    
+    h1 { font-size: 1.75rem; }
+    h2 { font-size: 1.5rem; }
+    
+    table {
+        font-size: 0.875rem;
+    }
+    
+    th, td {
+        padding: 0.5rem;
+    }
+}
+
+</style>
+</head>
+<body>
+<nav class="docweave-nav">
+<a href="index.html" class="back-to-root">Back to CoilViewer</a>
+</nav>
+<header id="title-block-header">
+<h1 class="title">Object Detection Input Size Configuration Guide</h1>
+</header>
+<h1 id="object-detection-input-size-configuration-guide">Object Detection Input Size Configuration Guide</h1>
+<h2 id="understanding-input-size">Understanding Input Size</h2>
+<p>The "input size" refers to the resolution (width x height) that images are resized to before being fed into the object detection model. By default, MobileNetV2 uses <strong>224x224 pixels</strong>.</p>
+<h2 id="why-larger-input-sizes">Why Larger Input Sizes?</h2>
+<p><strong>Larger input sizes can improve detection accuracy</strong> because:</p>
+<ul>
+<li>More detail is preserved from the original image</li>
+<li>Small objects are less likely to be lost during downsampling</li>
+<li>Finer features are retained for better classification</li>
+</ul>
+<p><strong>Trade-offs:</strong></p>
+<ul>
+<li><strong>Processing time increases</strong>: A 512x512 image has ~5x more pixels than 224x224</li>
+<li><strong>Memory usage increases</strong>: Larger tensors require more RAM</li>
+<li><strong>Model compatibility</strong>: The ONNX model file may have fixed dimensions</li>
+</ul>
+<h2 id="current-model-mobilenetv2">Current Model: MobileNetV2</h2>
+<p>Your <code>mobilenet_v2.onnx</code> model will report its expected input dimensions when initialized. You'll see a log message like:</p>
+<pre><code>Model input shape: [1, 3, 224, 224]
+Detected input size: 224x224</code></pre>
+<h2 id="testing-your-models-flexibility">Testing Your Model's Flexibility</h2>
+<p>Your current MobileNetV2 model was likely exported with <strong>fixed dimensions (224x224)</strong>. However, some models support dynamic/flexible input sizes.</p>
+<h3 id="to-test-if-your-model-supports-larger-inputs">To test if your model supports larger inputs:</h3>
+<ol type="1">
+<li>Open <code>config.json</code> in the CoilViewer directory</li>
+<li>Add or modify the <code>ObjectDetectionInputSize</code> field:</li>
+</ol>
+<div class="sourceCode" id="cb2"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;EnableObjectDetection&quot;</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;ObjectModelPath&quot;</span><span class="fu">:</span> <span class="st">&quot;..</span><span class="ch">\\</span><span class="st">..</span><span class="ch">\\</span><span class="st">Models</span><span class="ch">\\</span><span class="st">mobilenet_v2.onnx&quot;</span><span class="fu">,</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;ObjectLabelsPath&quot;</span><span class="fu">:</span> <span class="st">&quot;..</span><span class="ch">\\</span><span class="st">..</span><span class="ch">\\</span><span class="st">Models</span><span class="ch">\\</span><span class="st">imagenet_labels.txt&quot;</span><span class="fu">,</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;ObjectDetectionInputSize&quot;</span><span class="fu">:</span> <span class="dv">299</span><span class="fu">,</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="er">...</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<ol start="3" type="1">
+<li>Launch CoilViewer and check the logs:
+<ul>
+<li>If it works: You'll see "Using configured input size: 299x299"</li>
+<li>If it fails: You'll see an error about dimension mismatch</li>
+</ul></li>
+</ol>
+<h2 id="common-input-sizes-for-imagenet-models">Common Input Sizes for ImageNet Models</h2>
+<table>
+<thead>
+<tr>
+<th>Size</th>
+<th>Model Examples</th>
+<th>Relative Performance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>224x224</td>
+<td>MobileNetV1, MobileNetV2, ResNet50</td>
+<td>Baseline</td>
+</tr>
+<tr>
+<td>299x299</td>
+<td>InceptionV3, Xception</td>
+<td>~1.8x slower</td>
+</tr>
+<tr>
+<td>384x384</td>
+<td>EfficientNetB4, ViT-Base</td>
+<td>~3x slower</td>
+</tr>
+<tr>
+<td>512x512</td>
+<td>EfficientNetB6</td>
+<td>~5.3x slower</td>
+</tr>
+</tbody>
+</table>
+<h2 id="configuration-options">Configuration Options</h2>
+<h3 id="option-1-auto-detect-default">Option 1: Auto-Detect (Default)</h3>
+<div class="sourceCode" id="cb3"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;ObjectDetectionInputSize&quot;</span><span class="er">:</span> <span class="dv">0</span></span></code></pre></div>
+<p>The system will read the model's metadata and use its expected dimensions.</p>
+<h3 id="option-2-manual-override">Option 2: Manual Override</h3>
+<div class="sourceCode" id="cb4"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;ObjectDetectionInputSize&quot;</span><span class="er">:</span> <span class="dv">384</span></span></code></pre></div>
+<p>Force a specific input size. <strong>Warning</strong>: This may crash if your model doesn't support it!</p>
+<h2 id="getting-models-that-support-larger-inputs">Getting Models That Support Larger Inputs</h2>
+<p>If you want to use larger input sizes with better performance:</p>
+<h3 id="1-inceptionv3-299x299">1. InceptionV3 (299x299)</h3>
+<ul>
+<li>Better accuracy than MobileNetV2</li>
+<li>Native 299x299 input</li>
+<li>Download ONNX model from ONNX Model Zoo or export from PyTorch/TensorFlow</li>
+</ul>
+<h3 id="2-efficientnet-family">2. EfficientNet family</h3>
+<ul>
+<li>State-of-the-art accuracy/efficiency trade-off</li>
+<li>EfficientNet-B0: 224x224</li>
+<li>EfficientNet-B1: 240x240</li>
+<li>EfficientNet-B2: 260x260</li>
+<li>EfficientNet-B3: 300x300</li>
+<li>EfficientNet-B4: 380x380</li>
+</ul>
+<h3 id="3-dynamic-input-models">3. Dynamic Input Models</h3>
+<p>Some models can be exported with dynamic dimensions:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># PyTorch example</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>torch.onnx.export(</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    model, </span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    dummy_input,</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;mobilenet_dynamic.onnx&quot;</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    dynamic_axes<span class="op">=</span>{<span class="st">&#39;input&#39;</span>: {<span class="dv">2</span>: <span class="st">&#39;height&#39;</span>, <span class="dv">3</span>: <span class="st">&#39;width&#39;</span>}}</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+<h2 id="real-world-example">Real-World Example</h2>
+<p>Let's say you have a 4K image (3840x2160) and want to detect objects:</p>
+<h3 id="with-224x224-input">With 224x224 input:</h3>
+<ul>
+<li>Image is downsampled from 3840x2160 → 224x224</li>
+<li>~97% of pixels are discarded</li>
+<li>Small objects may disappear entirely</li>
+<li>Processing time: ~50-100ms per image</li>
+</ul>
+<h3 id="with-512x512-input">With 512x512 input:</h3>
+<ul>
+<li>Image is downsampled from 3840x2160 → 512x512</li>
+<li>~93% of pixels are discarded (but less than 224x224)</li>
+<li>Small objects better preserved</li>
+<li>Processing time: ~250-500ms per image</li>
+</ul>
+<h2 id="recommendations">Recommendations</h2>
+<h3 id="for-speed-real-time-browsing">For Speed (real-time browsing):</h3>
+<div class="sourceCode" id="cb6"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;ObjectDetectionInputSize&quot;</span><span class="er">:</span> <span class="dv">224</span></span></code></pre></div>
+<h3 id="for-balanced-performance">For Balanced Performance:</h3>
+<div class="sourceCode" id="cb7"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;ObjectDetectionInputSize&quot;</span><span class="er">:</span> <span class="dv">299</span></span></code></pre></div>
+<h3 id="for-maximum-accuracy-dont-care-about-speed">For Maximum Accuracy (don't care about speed):</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;ObjectDetectionInputSize&quot;</span><span class="er">:</span> <span class="dv">512</span></span></code></pre></div>
+<p><strong>Note</strong>: Only works if you have a model that supports this size!</p>
+<h2 id="checking-the-logs">Checking the Logs</h2>
+<p>After changing the input size, launch CoilViewer and check <code>coilviewer-launch.log</code>:</p>
+<pre><code>Object detection initialized with CPU...
+Model input shape: [1, 3, 224, 224]
+Using configured input size: 384x384
+Object detection service initialized successfully</code></pre>
+<p>Or if there's an error:</p>
+<pre><code>Failed to initialize object detection service: Input tensor shape mismatch
+Expected [1, 3, 224, 224] but got [1, 3, 384, 384]</code></pre>
+<h2 id="next-steps">Next Steps</h2>
+<ol type="1">
+<li><strong>Try the current model</strong> with <code>ObjectDetectionInputSize: 299</code> to see if it's flexible</li>
+<li><strong>Monitor performance</strong>: Check the average ms per image in the logs</li>
+<li><strong>If you need larger inputs</strong>: Consider downloading a different model architecture</li>
+<li><strong>Remember</strong>: Higher resolution ≠ always better if the model wasn't trained for it</li>
+</ol>
+<h2 id="technical-details">Technical Details</h2>
+<p>The system now:</p>
+<ul>
+<li>✓ Auto-detects model input dimensions from ONNX metadata</li>
+<li>✓ Allows manual override via config</li>
+<li>✓ Uses high-quality bicubic interpolation for resizing</li>
+<li>✓ Logs detected/configured input size for verification</li>
+<li>✓ Maintains proper ImageNet normalization regardless of input size</li>
+</ul>
+<footer class="docweave-footer">
+<div class="backlinks">
+<strong>Referenced by:</strong> 
+<a href="index.html">CoilViewer</a>
+</div>
+<div class="docweave-credit">Generated by docweave</div>
+</footer>
+</body>
+</html>

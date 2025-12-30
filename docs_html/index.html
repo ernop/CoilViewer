@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>CoilViewer</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+<style>
+
+:root {
+    --bg: #ffffff;
+    --bg-subtle: #f8f9fa;
+    --bg-code: #f4f4f4;
+    --text: #212529;
+    --text-muted: #6c757d;
+    --accent: #0d6efd;
+    --accent-hover: #0a58ca;
+    --border: #dee2e6;
+    --link-visited: #6610f2;
+    --success: #198754;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    background: var(--bg);
+    color: var(--text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+    line-height: 1.2;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    color: var(--text);
+}
+
+h1 {
+    font-size: 2.25rem;
+    font-weight: 300;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+h2 {
+    font-size: 1.75rem;
+    font-weight: 400;
+}
+
+h3 {
+    font-size: 1.375rem;
+}
+
+h4 { font-size: 1.125rem; }
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+a:visited {
+    color: var(--link-visited);
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875em;
+    background: var(--bg-code);
+    color: #d63384;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+}
+
+pre {
+    background: var(--bg-code);
+    padding: 1rem;
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin: 1rem 0;
+}
+
+pre code {
+    padding: 0;
+    background: none;
+    color: var(--text);
+    font-size: 0.875rem;
+}
+
+blockquote {
+    border-left: 4px solid var(--accent);
+    margin: 1rem 0;
+    padding: 0.5rem 1rem;
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+}
+
+blockquote p {
+    margin: 0;
+}
+
+ul, ol {
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+}
+
+li {
+    margin-bottom: 0.25rem;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+}
+
+th, td {
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    text-align: left;
+}
+
+th {
+    background: var(--bg-subtle);
+    font-weight: 600;
+}
+
+tr:nth-child(even) {
+    background: var(--bg-subtle);
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+/* Navigation */
+.docweave-nav {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.back-to-root {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: all 0.15s ease-in-out;
+}
+
+.back-to-root:hover {
+    background: var(--accent);
+    color: white;
+    text-decoration: none;
+    border-color: var(--accent);
+}
+
+/* Footer */
+.docweave-footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.backlinks {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-subtle);
+    border-radius: 4px;
+}
+
+.backlinks strong {
+    color: var(--text);
+}
+
+.backlinks a {
+    color: var(--accent);
+}
+
+.docweave-credit {
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    body {
+        padding: 1rem;
+    }
+    
+    h1 { font-size: 1.75rem; }
+    h2 { font-size: 1.5rem; }
+    
+    table {
+        font-size: 0.875rem;
+    }
+    
+    th, td {
+        padding: 0.5rem;
+    }
+}
+
+</style>
+</head>
+<body>
+
+<header id="title-block-header">
+<h1 class="title">CoilViewer</h1>
+</header>
+<h1 id="coilviewer">CoilViewer</h1>
+<p>High-speed fullscreen image browser focused on instant navigation through large folders on Windows with sane usability.</p>
+<ul>
+<li><a href="product.html">Product Requirements</a> - Feature list and requirements tracker</li>
+</ul>
+<h2 id="supported-formats">Supported Formats</h2>
+<ul>
+<li>PNG (<code>.png</code>)</li>
+<li>JPEG (<code>.jpg</code>, <code>.jpeg</code>, <code>.jpe</code>, <code>.jfif</code>)</li>
+<li>WebP (<code>.webp</code>, requires Windows WebP codec - bundled with modern Windows 10/11)</li>
+<li>GIF (<code>.gif</code>, displayed as the first frame)</li>
+<li>BMP / DIB (<code>.bmp</code>, <code>.dib</code>)</li>
+<li>TIFF (<code>.tiff</code>, <code>.tif</code>)</li>
+</ul>
+<p>The viewer relies on Windows Imaging Component. Any additional codecs registered with WIC (e.g. HEIC/HEIF) will also work if you add their extensions to <code>config.json</code>.</p>
+<h2 id="build">Build</h2>
+<ul>
+<li>Requires .NET SDK 8.0 or later.</li>
+<li>Restore and build: <code>dotnet build CoilViewer/CoilViewer.csproj</code></li>
+<li>Optional portable release: <code>dotnet publish CoilViewer/CoilViewer.csproj -c Release -r win-x64 --self-contained false</code></li>
+<li>The published folder contains <code>CoilViewer.exe</code>. Copy the entire directory to keep the app portable.</li>
+</ul>
+<h2 id="usage">Usage</h2>
+<ul>
+<li>Launch <code>CoilViewer.exe</code> directly, double-click an image file, or pass a file/folder path: <code>CoilViewer.exe "C:\path\image.png"</code></li>
+<li>Keyboard:
+<ul>
+<li><code>Right</code>, <code>Down</code>, <code>Space</code>: next image</li>
+<li><code>Left</code>, <code>Up</code>, <code>Backspace</code>: previous image</li>
+<li><code>Home</code>/<code>End</code>: jump to first/last image</li>
+<li><code>Ctrl+Shift+Arrow</code>: jump halfway toward start/end of sequence</li>
+<li><code>A</code>: archive current image to "old" subfolder (moves file and shows next image instantly)</li>
+<li><code>Ctrl+O</code>: open image to load its folder</li>
+<li><code>Ctrl+R</code>: reload <code>config.json</code></li>
+<li><code>I</code>: toggle metadata overlay</li>
+<li><code>/</code> or <code>?</code>: show keyboard shortcuts</li>
+<li><code>=</code>/<code>-</code>: zoom in/out</li>
+<li><code>\</code>: reset zoom</li>
+<li><code>F11</code> or double-click: toggle fullscreen</li>
+<li><code>Esc</code>: exit fullscreen or close the app</li>
+</ul></li>
+<li>Mouse:
+<ul>
+<li>Scroll wheel to navigate</li>
+<li>Double-click toggles fullscreen</li>
+<li>Drag window when not fullscreen</li>
+</ul></li>
+<li>Drag &amp; drop a file or folder onto the window to switch folders.</li>
+<li>Right-click anywhere to open the "Sort" context menu. Choose field (file name, created date, modified date, size) and direction (ascending/descending). The choice is saved immediately and re-used on next launch.</li>
+</ul>
+<p>The viewer preloads adjacent images in the background for instant navigation and caches them in memory. Large folders (5k+ images) are handled without blocking the UI.</p>
+<h2 id="configuration">Configuration</h2>
+<p>A <code>config.json</code> file is created next to the executable on first launch:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;PreloadImageCount&quot;</span><span class="fu">:</span> <span class="dv">20</span><span class="fu">,</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;BackgroundColor&quot;</span><span class="fu">:</span> <span class="st">&quot;#000000&quot;</span><span class="fu">,</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;FitMode&quot;</span><span class="fu">:</span> <span class="st">&quot;Uniform&quot;</span><span class="fu">,</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;ScalingMode&quot;</span><span class="fu">:</span> <span class="st">&quot;HighQuality&quot;</span><span class="fu">,</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;ShowOverlay&quot;</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;LoopAround&quot;</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;SortField&quot;</span><span class="fu">:</span> <span class="st">&quot;FileName&quot;</span><span class="fu">,</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;SortDirection&quot;</span><span class="fu">:</span> <span class="st">&quot;Ascending&quot;</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<ul>
+<li><code>PreloadImageCount</code>: number of images to preload on each side of the current image. The cache will hold up to (PreloadImageCount * 2 + 1) images total. Default: 20.</li>
+<li><code>BackgroundColor</code>: any WPF color string (e.g. <code>#111111</code>, <code>Black</code>).</li>
+<li><code>FitMode</code>: <code>Uniform</code>, <code>UniformToFill</code>, <code>Fill</code>, or <code>None</code>.</li>
+<li><code>ScalingMode</code>: <code>HighQuality</code>, <code>Fant</code>, <code>LowQuality</code>, or <code>NearestNeighbor</code>.</li>
+<li><code>ShowOverlay</code>: toggles filename/resolution HUD.</li>
+<li><code>LoopAround</code>: wrap navigation at folder ends.</li>
+<li><code>SortField</code>: <code>FileName</code>, <code>CreationTime</code>, <code>LastWriteTime</code>, or <code>FileSize</code>.</li>
+<li><code>SortDirection</code>: <code>Ascending</code> or <code>Descending</code>.</li>
+</ul>
+<p>Update the file, then press <code>Ctrl+R</code> to reload without restarting. Right-click -&gt; Sort also updates these values automatically.</p>
+<h2 id="set-as-default-viewer">Set as Default Viewer</h2>
+<p>For a portable setup:</p>
+<ol type="1">
+<li>Publish or copy the build output to a permanent directory.</li>
+<li>Right-click a <code>.png</code> (or other image) -&gt; <code>Open with</code> -&gt; <code>Choose another app</code>.</li>
+<li>Enable <code>Always use this app</code>, click <code>More apps</code>, then <code>Look for another app on this PC</code>.</li>
+<li>Browse to <code>CoilViewer.exe</code> and select it.</li>
+</ol>
+<p>Windows will then launch Coil Viewer for that extension. Repeat for additional image types if desired.</p>
+<hr />
+<h2 id="performance--optimization">Performance &amp; Optimization</h2>
+<ul>
+<li><a href="STARTUP_OPTIMIZATION_REPORT.html">Startup Optimization Report</a> - Performance analysis and optimizations</li>
+<li><a href="STARTUP_TIMING_INSTRUMENTATION.html">Startup Timing Instrumentation</a> - How startup timing is measured</li>
+<li><a href="NATIVE_AOT_EXPLAINED.html">Native AOT Explained</a> - Ahead-of-time compilation details</li>
+<li><a href="NET_RUNTIME_VERSION_ISSUE.html">.NET Runtime Version Issue</a> - Runtime compatibility notes</li>
+</ul>
+<h2 id="machine-learning-features">Machine Learning Features</h2>
+<p>CoilViewer supports optional AI-powered image filtering using ONNX models.</p>
+<h3 id="setup-guides">Setup Guides</h3>
+<ul>
+<li><a href="NSFW_DETECTION_SETUP.html">NSFW Detection Setup</a> - How to enable NSFW filtering</li>
+<li><a href="MODEL_DOWNLOAD_GUIDE.html">Model Download Guide</a> - Where to get the ML models</li>
+<li><a href="MODEL_TESTING_GUIDE.html">Model Testing Guide</a> - How to verify models work correctly</li>
+</ul>
+<h3 id="technical-details">Technical Details</h3>
+<ul>
+<li><a href="ML_MODEL_INTERACTION.html">ML Model Interaction</a> - How the app interfaces with ONNX models</li>
+<li><a href="OBJECT_DETECTION_OPTIMIZATION.html">Object Detection Optimization</a> - Performance tuning for inference</li>
+<li><a href="OBJECT_DETECTION_INPUT_SIZE_GUIDE.html">Object Detection Input Size Guide</a> - Input preprocessing details</li>
+<li><a href="OBJECT_DETECTION_CHANGES_SUMMARY.html">Object Detection Changes Summary</a> - Recent changes to detection code</li>
+<li><a href="INPUT_SIZE_IMPLEMENTATION_SUMMARY.html">Input Size Implementation Summary</a> - Input sizing implementation details</li>
+<li><a href="MODELS_MOVED_SUMMARY.html">Models Moved Summary</a> - Model file location changes</li>
+</ul>
+<h2 id="development-notes">Development Notes</h2>
+<ul>
+<li><a href="ZOOM_PAN_POSTMORTEM.html">Zoom/Pan Postmortem</a> - Lessons from implementing zoom/pan</li>
+<li><a href="zoom_pan_postmortem_opus_view.html">Zoom/Pan Postmortem (Extended)</a> - Detailed technical analysis</li>
+</ul>
+<footer class="docweave-footer">
+<div class="docweave-credit">Generated by docweave</div>
+</footer>
+</body>
+</html>

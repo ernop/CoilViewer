@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>ML Model Interaction Overview</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+<style>
+
+:root {
+    --bg: #ffffff;
+    --bg-subtle: #f8f9fa;
+    --bg-code: #f4f4f4;
+    --text: #212529;
+    --text-muted: #6c757d;
+    --accent: #0d6efd;
+    --accent-hover: #0a58ca;
+    --border: #dee2e6;
+    --link-visited: #6610f2;
+    --success: #198754;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    background: var(--bg);
+    color: var(--text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+    line-height: 1.2;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    color: var(--text);
+}
+
+h1 {
+    font-size: 2.25rem;
+    font-weight: 300;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+h2 {
+    font-size: 1.75rem;
+    font-weight: 400;
+}
+
+h3 {
+    font-size: 1.375rem;
+}
+
+h4 { font-size: 1.125rem; }
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+a:visited {
+    color: var(--link-visited);
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875em;
+    background: var(--bg-code);
+    color: #d63384;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+}
+
+pre {
+    background: var(--bg-code);
+    padding: 1rem;
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin: 1rem 0;
+}
+
+pre code {
+    padding: 0;
+    background: none;
+    color: var(--text);
+    font-size: 0.875rem;
+}
+
+blockquote {
+    border-left: 4px solid var(--accent);
+    margin: 1rem 0;
+    padding: 0.5rem 1rem;
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+}
+
+blockquote p {
+    margin: 0;
+}
+
+ul, ol {
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+}
+
+li {
+    margin-bottom: 0.25rem;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+}
+
+th, td {
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    text-align: left;
+}
+
+th {
+    background: var(--bg-subtle);
+    font-weight: 600;
+}
+
+tr:nth-child(even) {
+    background: var(--bg-subtle);
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+/* Navigation */
+.docweave-nav {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.back-to-root {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: all 0.15s ease-in-out;
+}
+
+.back-to-root:hover {
+    background: var(--accent);
+    color: white;
+    text-decoration: none;
+    border-color: var(--accent);
+}
+
+/* Footer */
+.docweave-footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.backlinks {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-subtle);
+    border-radius: 4px;
+}
+
+.backlinks strong {
+    color: var(--text);
+}
+
+.backlinks a {
+    color: var(--accent);
+}
+
+.docweave-credit {
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    body {
+        padding: 1rem;
+    }
+    
+    h1 { font-size: 1.75rem; }
+    h2 { font-size: 1.5rem; }
+    
+    table {
+        font-size: 0.875rem;
+    }
+    
+    th, td {
+        padding: 0.5rem;
+    }
+}
+
+</style>
+</head>
+<body>
+<nav class="docweave-nav">
+<a href="index.html" class="back-to-root">Back to CoilViewer</a>
+</nav>
+<header id="title-block-header">
+<h1 class="title">ML Model Interaction Overview</h1>
+</header>
+<h1 id="ml-model-interaction-overview">ML Model Interaction Overview</h1>
+<h2 id="architecture">Architecture</h2>
+<p>CoilViewer uses ONNX Runtime for local ML inference. Two detection services are available:</p>
+<ol type="1">
+<li><p><strong>NSFW Detection Service</strong> (<code>NsfwDetectionService.cs</code>)</p>
+<ul>
+<li>Binary classification: safe vs. NSFW content</li>
+<li>Uses ONNX models (e.g., NSFW detector models)</li>
+<li>Input: 224x224 RGB image, normalized</li>
+<li>Output: [safe_probability, nsfw_probability]</li>
+</ul></li>
+<li><p><strong>Object Detection Service</strong> (<code>ObjectDetectionService.cs</code>)</p>
+<ul>
+<li>Multi-class classification: ImageNet-style object recognition</li>
+<li>Uses ONNX models (e.g., MobileNet, ResNet)</li>
+<li>Input: 224x224 RGB image, ImageNet-normalized</li>
+<li>Output: Top-K class predictions with confidence scores</li>
+</ul></li>
+</ol>
+<h2 id="opt-in-design">Opt-In Design</h2>
+<p><strong>Default State: DISABLED</strong></p>
+<ul>
+<li><code>EnableNsfwDetection</code> defaults to <code>false</code></li>
+<li><code>EnableObjectDetection</code> defaults to <code>false</code></li>
+<li>Services do not initialize unless explicitly enabled</li>
+</ul>
+<p><strong>Initialization Requirements:</strong></p>
+<ol type="1">
+<li>User must set <code>EnableNsfwDetection: true</code> or <code>EnableObjectDetection: true</code> in <code>config.json</code></li>
+<li>Model file must exist at the specified path</li>
+<li>If model is missing, service logs a message and disables gracefully (no crash)</li>
+</ol>
+<p><strong>No Automatic Downloads:</strong></p>
+<ul>
+<li>Models are never downloaded automatically</li>
+<li>User must manually obtain and place model files</li>
+<li>No network requests are made without explicit user action</li>
+</ul>
+<h2 id="detection-flow">Detection Flow</h2>
+<ol type="1">
+<li><strong>Startup</strong>: Services initialize only if enabled AND model file exists</li>
+<li><strong>Image Display</strong>: When an image is shown, detection runs asynchronously in background</li>
+<li><strong>Caching</strong>: Results are cached in <code>DetectionCache</code> to avoid re-detection</li>
+<li><strong>Filtering</strong>: Filter panel (F key) applies cached results to filter image sequence</li>
+</ol>
+<h2 id="gpu-acceleration">GPU Acceleration</h2>
+<ul>
+<li>Services attempt CUDA GPU acceleration if available</li>
+<li>Falls back to CPU automatically if GPU unavailable</li>
+<li>No user configuration required for GPU detection</li>
+</ul>
+<h2 id="user-control">User Control</h2>
+<ul>
+<li>Filter panel (F key) provides UI for:
+<ul>
+<li>NSFW filter: All / No NSFW / NSFW Only</li>
+<li>Object filter: Show All / Show Only [text] / Exclude [text]</li>
+</ul></li>
+<li>Filters apply only to already-detected images (uses cache)</li>
+<li>Detection runs passively in background as images are viewed</li>
+</ul>
+<footer class="docweave-footer">
+<div class="backlinks">
+<strong>Referenced by:</strong> 
+<a href="index.html">CoilViewer</a>
+</div>
+<div class="docweave-credit">Generated by docweave</div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Zoom/Pan Postmortem (CoilViewer) - 2025-12-30</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+<style>
+
+:root {
+    --bg: #ffffff;
+    --bg-subtle: #f8f9fa;
+    --bg-code: #f4f4f4;
+    --text: #212529;
+    --text-muted: #6c757d;
+    --accent: #0d6efd;
+    --accent-hover: #0a58ca;
+    --border: #dee2e6;
+    --link-visited: #6610f2;
+    --success: #198754;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    background: var(--bg);
+    color: var(--text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+    line-height: 1.2;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    color: var(--text);
+}
+
+h1 {
+    font-size: 2.25rem;
+    font-weight: 300;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+h2 {
+    font-size: 1.75rem;
+    font-weight: 400;
+}
+
+h3 {
+    font-size: 1.375rem;
+}
+
+h4 { font-size: 1.125rem; }
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+a:visited {
+    color: var(--link-visited);
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875em;
+    background: var(--bg-code);
+    color: #d63384;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+}
+
+pre {
+    background: var(--bg-code);
+    padding: 1rem;
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin: 1rem 0;
+}
+
+pre code {
+    padding: 0;
+    background: none;
+    color: var(--text);
+    font-size: 0.875rem;
+}
+
+blockquote {
+    border-left: 4px solid var(--accent);
+    margin: 1rem 0;
+    padding: 0.5rem 1rem;
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+}
+
+blockquote p {
+    margin: 0;
+}
+
+ul, ol {
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+}
+
+li {
+    margin-bottom: 0.25rem;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+}
+
+th, td {
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    text-align: left;
+}
+
+th {
+    background: var(--bg-subtle);
+    font-weight: 600;
+}
+
+tr:nth-child(even) {
+    background: var(--bg-subtle);
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+/* Navigation */
+.docweave-nav {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.back-to-root {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: all 0.15s ease-in-out;
+}
+
+.back-to-root:hover {
+    background: var(--accent);
+    color: white;
+    text-decoration: none;
+    border-color: var(--accent);
+}
+
+/* Footer */
+.docweave-footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.backlinks {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-subtle);
+    border-radius: 4px;
+}
+
+.backlinks strong {
+    color: var(--text);
+}
+
+.backlinks a {
+    color: var(--accent);
+}
+
+.docweave-credit {
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    body {
+        padding: 1rem;
+    }
+    
+    h1 { font-size: 1.75rem; }
+    h2 { font-size: 1.5rem; }
+    
+    table {
+        font-size: 0.875rem;
+    }
+    
+    th, td {
+        padding: 0.5rem;
+    }
+}
+
+</style>
+</head>
+<body>
+<nav class="docweave-nav">
+<a href="index.html" class="back-to-root">Back to CoilViewer</a>
+</nav>
+<header id="title-block-header">
+<h1 class="title">Zoom/Pan Postmortem (CoilViewer) - 2025-12-30</h1>
+</header>
+<h1 id="zoompan-postmortem-coilviewer---2025-12-30">Zoom/Pan Postmortem (CoilViewer) - 2025-12-30</h1>
+<p>This is a postmortem of the zoom/pan debugging session. Per request, it includes:</p>
+<ul>
+<li>Exact user prompts from this chat (verbatim, including typos).</li>
+<li>Exact timestamps only where we have a trustworthy source (the <code>coilviewer-launch.log</code> file). Chat-message timestamps are not provided in this environment, so those rows are marked <code>N/A</code> rather than guessed.</li>
+<li>Exact responding agent identity: <code>Cursor coding agent (GPT-5.2)</code> for every assistant response in this session.</li>
+<li>File counts where we can be exact. Per-step file counts are not recorded automatically, so only the final overall file set is exact.</li>
+</ul>
+<h2 id="exact-request-timeline-chat-prompts-in-a-table">Exact request timeline (chat prompts) in a table</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Row</th>
+<th>Time (exact)</th>
+<th>Time source</th>
+<th>Request prompt (exact)</th>
+<th>Responding agent (exact)</th>
+<th>What we did / learned (high level)</th>
+<th style="text-align: right;">Files modified (count)</th>
+<th>Files modified (exact list)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>review the zooming logic in extreme detail as well as the keys to control it.  think carefully about how this program and others set this up logicall, and the abstractions and systems they use to clearly organize and understand things like "where am i in the zoomed image" and what the controls should do</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Read existing zoom/pan and explained coordinate-system risks (Stretch + extra transforms).</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>sory, i didn't mean to ask you to validate and read it; in reality, this method we have here doesn't acutally work. i'm not sure if it's a deep issue that's hard to solve without massive hacks, i.e. there is no elegant solution, or whether we are close or not. but overall, i'm just unhappy since it really doesn't work well.  i.e. "well" means rules like: if you zoom while looking at a scene, then the "area you zoom into" either the center or the mouse local, will still be mostly visible.  2. that you wouldn't be naturally easily zoomedi nto areas o the canvas which dont even have the image in them except at the distant edge.  that it'd be easy and natural t o zoom in and out and see/know where you are while also using arrow keys to move.  can you suggest why this may be going wrong, and if there's another better way to just dramatically improve this?</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Identified that the current model was mixing coordinate systems; proposed a "single source of truth" approach.</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>huh, from my tests zooming into maximized WIDE images seems okay but TALL and narrow ones, when i hit zoom, i end up in a place that doesn't make sense</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Focused on aspect-ratio / letterboxing: tall images expose the anchor bug more than wide images.</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>zooming in a tall image incorrectly prefers to zoom "at" the lower right corner of the image, ignoring the mouse. if we want we can prefer mouse and follow that. but even more basic, we could just zoom center by default.\n\nalso another problem: the arrow key scrollings let us go WAY past into the black. at least a tiny bit of the image is usually visible, but i don't see any reason to let us go into black when we're this full screen anyway, at all!  also, the arrow key panning limits are not the same left/right up/down</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Attempted center zoom and tried to tighten pan limits. Root cause turned out to be that we were clamping in the wrong coordinate space.</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">5</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>are you rebuilding the app? you should</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Confirmed rebuilds and added a kill + rebuild workflow.</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>i tested.\n\nzooming still seems to zoom me into the lower right corner of the image, not the top.    but only for all imaegs.  more wide ones it does wel]</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Realized scaling via RenderTransform was breaking layout; pivoted toward LayoutTransform for scale.</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">7</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>when you need to build please pkill the open process, rebuild and then let me know</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Adopted "taskkill then build Debug+Release" as the standard.</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>let's work together to take time and imagine what will happen if we open a 500x4000pixel image.  where should it be shown initially at max size preserving ar on a msaller creen? what position in the viewport for the viewer? centered vertical?horizontal? left pushed? what is your view on the best way to do this, do you think</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Agreed on center/center for an image viewer; identified that RenderTransform scaling breaks layout centering.</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">9</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>yes</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Implemented scale as LayoutTransform (so arranged size matches scaled size).</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">10</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>great. the zoom target is working well now.  still have a problem: the scrolling goes UP too far and LEFT too far. there's no benefit of scrolling the viewport ever into the blackness of the region which the image isn't in.</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Confirmed remaining issue: pan clamping was not anchored to an authoritative notion of viewport/content bounds.</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">11</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>they may be calculated symmetrically, but what are they anchored off of?\n\nhitting = and - now does nothing. we totally lost zooming now?</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Realized refactors had temporarily broken zoom; tightened rebuild/debug approach and added more logging.</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">12</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>okay i opened and zoomed and scrolled. did you get all that in the log? on th left and top i was able to scroll too far well into the black of hte image.</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Added pan clamp logging; pulled evidence from <code>coilviewer-launch.log</code>.</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">13</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>i have done that. issue  still bad</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Used log evidence to stop guessing and change approach.</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">14</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>go back and find a way to test this all yourself. we nee to understand our libraries more iterate til you can self-test and use that to solve this.</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Built <code>--selftest</code> and started moving toward library-native behavior (ScrollViewer-driven panning).</td>
+<td style="text-align: right;">N/A</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align: right;">15</td>
+<td>2025-12-30T14:10:51.6484657-05:00</td>
+<td><code>coilviewer-launch.log</code></td>
+<td><code>finally that's right! how did you do it? what was the issue? write up the entire saga with timestamps and attempts and why each was wrong and etc into a new md file postmortem on this entire issue, super detailed with reasons and retroactive analysis</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Working fix: pan via ScrollViewer offsets (clamped by ScrollViewer), zoom via LayoutTransform scale, anchor zoom in content coordinates. Added headless math selftest which passed.</td>
+<td style="text-align: right;">6</td>
+<td><code>CoilViewer/App.xaml.cs</code>, <code>CoilViewer/MainWindow.xaml</code>, <code>CoilViewer/MainWindow.xaml.cs</code>, <code>CoilViewer/ZoomPanMath.cs</code> (new), <code>CoilViewer/ZoomPanSelfTest.cs</code> (new), <a href="ZOOM_PAN_POSTMORTEM.html"><code>ZOOM_PAN_POSTMORTEM.md</code></a> (new)</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td>N/A</td>
+<td>Chat timestamps unavailable</td>
+<td><code>can you include the exact prompt used in each request? cna you include the exact time and also the exact agent which responded, and how mnay files ewere modified, in addition to the current great output data?\n\ndon't use any special non-ascii chars in this, never use fancy quotes ofa ny kind.\n\nconvert output to an md table plase.</code></td>
+<td>Cursor coding agent (GPT-5.2)</td>
+<td>Converted postmortem into this table; removed non-ascii punctuation; called out which "exact" fields are not available from the environment.</td>
+<td style="text-align: right;">6</td>
+<td>(same as row 15)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="notes-on-exact-times">Notes on "exact times"</h2>
+<ul>
+<li>Exact chat timestamps are not available in this environment.</li>
+<li>Exact program/runtime timestamps are available in <code>coilviewer-launch.log</code> and were used where possible (selftest run).</li>
+</ul>
+<footer class="docweave-footer">
+<div class="backlinks">
+<strong>Referenced by:</strong> 
+<a href="ZOOM_PAN_POSTMORTEM.html">Zoom/Pan Postmortem (CoilViewer) - 2025-12-30</a> | <a href="index.html">CoilViewer</a>
+</div>
+<div class="docweave-credit">Generated by docweave</div>
+</footer>
+</body>
+</html>

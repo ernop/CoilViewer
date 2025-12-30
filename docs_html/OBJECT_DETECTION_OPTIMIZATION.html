@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Object Detection Optimization Guide</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+<style>
+
+:root {
+    --bg: #ffffff;
+    --bg-subtle: #f8f9fa;
+    --bg-code: #f4f4f4;
+    --text: #212529;
+    --text-muted: #6c757d;
+    --accent: #0d6efd;
+    --accent-hover: #0a58ca;
+    --border: #dee2e6;
+    --link-visited: #6610f2;
+    --success: #198754;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    background: var(--bg);
+    color: var(--text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+    line-height: 1.2;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    color: var(--text);
+}
+
+h1 {
+    font-size: 2.25rem;
+    font-weight: 300;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+h2 {
+    font-size: 1.75rem;
+    font-weight: 400;
+}
+
+h3 {
+    font-size: 1.375rem;
+}
+
+h4 { font-size: 1.125rem; }
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+a:visited {
+    color: var(--link-visited);
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875em;
+    background: var(--bg-code);
+    color: #d63384;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+}
+
+pre {
+    background: var(--bg-code);
+    padding: 1rem;
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin: 1rem 0;
+}
+
+pre code {
+    padding: 0;
+    background: none;
+    color: var(--text);
+    font-size: 0.875rem;
+}
+
+blockquote {
+    border-left: 4px solid var(--accent);
+    margin: 1rem 0;
+    padding: 0.5rem 1rem;
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+}
+
+blockquote p {
+    margin: 0;
+}
+
+ul, ol {
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+}
+
+li {
+    margin-bottom: 0.25rem;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+}
+
+th, td {
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    text-align: left;
+}
+
+th {
+    background: var(--bg-subtle);
+    font-weight: 600;
+}
+
+tr:nth-child(even) {
+    background: var(--bg-subtle);
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+/* Navigation */
+.docweave-nav {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.back-to-root {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: all 0.15s ease-in-out;
+}
+
+.back-to-root:hover {
+    background: var(--accent);
+    color: white;
+    text-decoration: none;
+    border-color: var(--accent);
+}
+
+/* Footer */
+.docweave-footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.backlinks {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-subtle);
+    border-radius: 4px;
+}
+
+.backlinks strong {
+    color: var(--text);
+}
+
+.backlinks a {
+    color: var(--accent);
+}
+
+.docweave-credit {
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    body {
+        padding: 1rem;
+    }
+    
+    h1 { font-size: 1.75rem; }
+    h2 { font-size: 1.5rem; }
+    
+    table {
+        font-size: 0.875rem;
+    }
+    
+    th, td {
+        padding: 0.5rem;
+    }
+}
+
+</style>
+</head>
+<body>
+<nav class="docweave-nav">
+<a href="index.html" class="back-to-root">Back to CoilViewer</a>
+</nav>
+<header id="title-block-header">
+<h1 class="title">Object Detection Optimization Guide</h1>
+</header>
+<h1 id="object-detection-optimization-guide">Object Detection Optimization Guide</h1>
+<h2 id="model-information">Model Information</h2>
+<ul>
+<li><strong>Model</strong>: MobileNetV2 (mobilenet_v2.onnx)</li>
+<li><strong>Framework</strong>: ONNX Runtime 1.19.0</li>
+<li><strong>Input Size</strong>: 224x224 pixels</li>
+<li><strong>Classes</strong>: 1000 ImageNet classes</li>
+</ul>
+<h2 id="optimizations-implemented">Optimizations Implemented</h2>
+<h3 id="1-onnx-runtime-session-configuration">1. ONNX Runtime Session Configuration</h3>
+<h4 id="graph-optimization-level">Graph Optimization Level</h4>
+<ul>
+<li><strong>Setting</strong>: <code>GraphOptimizationLevel.ORT_ENABLE_ALL</code></li>
+<li><strong>Benefits</strong>: Enables all available graph optimizations including:
+<ul>
+<li>Constant folding</li>
+<li>Redundant node elimination</li>
+<li>Operator fusion</li>
+<li>Layout optimization</li>
+<li>Memory planning optimization</li>
+</ul></li>
+<li><strong>Impact</strong>: Improves both speed and accuracy by optimizing the computation graph</li>
+</ul>
+<h4 id="execution-mode">Execution Mode</h4>
+<ul>
+<li><strong>Setting</strong>: <code>ExecutionMode.ORT_PARALLEL</code></li>
+<li><strong>Benefits</strong>: Allows operators to run in parallel when possible</li>
+<li><strong>Impact</strong>: Better CPU utilization for multi-threaded execution</li>
+</ul>
+<h4 id="thread-configuration">Thread Configuration</h4>
+<ul>
+<li><strong>InterOpNumThreads</strong>: Set to half of available CPU cores
+<ul>
+<li>Controls parallelism across independent operators</li>
+<li>Allows multiple operators to execute simultaneously</li>
+</ul></li>
+<li><strong>IntraOpNumThreads</strong>: Set to half of available CPU cores
+<ul>
+<li>Controls parallelism within individual operators</li>
+<li>Enables multi-threaded execution of matrix operations</li>
+</ul></li>
+<li><strong>Impact</strong>: Optimal CPU utilization without thread contention</li>
+</ul>
+<h4 id="memory-optimizations">Memory Optimizations</h4>
+<ul>
+<li><strong>EnableCpuMemArena</strong>: Enabled
+<ul>
+<li>Uses memory arena allocation for faster memory operations</li>
+<li>Reduces memory fragmentation</li>
+</ul></li>
+<li><strong>EnableMemPattern</strong>: Enabled
+<ul>
+<li>Optimizes memory allocation patterns</li>
+<li>Improves cache locality</li>
+</ul></li>
+<li><strong>Impact</strong>: Faster memory operations and better performance</li>
+</ul>
+<h3 id="2-image-preprocessing-improvements">2. Image Preprocessing Improvements</h3>
+<h4 id="high-quality-image-resizing">High-Quality Image Resizing</h4>
+<ul>
+<li><strong>Method</strong>: Bicubic interpolation with high-quality rendering</li>
+<li><strong>Settings</strong>:
+<ul>
+<li><code>InterpolationMode.HighQualityBicubic</code>: Superior image quality during resize</li>
+<li><code>SmoothingMode.HighQuality</code>: Reduces aliasing artifacts</li>
+<li><code>PixelOffsetMode.HighQuality</code>: More accurate pixel positioning</li>
+<li><code>CompositingQuality.HighQuality</code>: Better color blending</li>
+</ul></li>
+<li><strong>Impact</strong>: Better image quality input = more accurate predictions</li>
+</ul>
+<h4 id="fast-pixel-access">Fast Pixel Access</h4>
+<ul>
+<li><strong>Method</strong>: LockBits with unsafe code</li>
+<li><strong>Previous</strong>: GetPixel() method (very slow)</li>
+<li><strong>Current</strong>: Direct memory access via pointers</li>
+<li><strong>Impact</strong>: 10-100x faster pixel processing</li>
+</ul>
+<h4 id="correct-color-channel-processing">Correct Color Channel Processing</h4>
+<ul>
+<li><strong>Format</strong>: BGRA to RGB conversion with CHW layout</li>
+<li><strong>Normalization</strong>: ImageNet standard
+<ul>
+<li>Mean: [0.485, 0.456, 0.406] for RGB</li>
+<li>Std: [0.229, 0.224, 0.225] for RGB</li>
+</ul></li>
+<li><strong>Impact</strong>: Matches MobileNetV2 training preprocessing exactly</li>
+</ul>
+<h3 id="3-model-architecture">3. Model Architecture</h3>
+<p>MobileNetV2 is optimized for:</p>
+<ul>
+<li>Efficient inference on CPU</li>
+<li>Good accuracy-to-speed ratio</li>
+<li>Inverted residual structure with linear bottlenecks</li>
+<li>Lightweight depth-wise separable convolutions</li>
+</ul>
+<h3 id="4-configuration-requirements">4. Configuration Requirements</h3>
+<p>The project now requires:</p>
+<ul>
+<li><code>AllowUnsafeBlocks=true</code> in the .csproj file (for fast pixel access)</li>
+<li>System.Drawing.Common for Graphics operations</li>
+<li>Microsoft.ML.OnnxRuntime for inference</li>
+</ul>
+<h2 id="performance-characteristics">Performance Characteristics</h2>
+<h3 id="expected-performance">Expected Performance</h3>
+<ul>
+<li><strong>Accuracy</strong>: Maximized through high-quality preprocessing and optimal ONNX settings</li>
+<li><strong>Speed</strong>: Optimized for CPU multi-threading</li>
+<li><strong>Memory</strong>: Efficient memory usage through arena allocation</li>
+<li><strong>Typical inference time</strong>: 50-200ms per image on modern CPUs (varies by CPU)</li>
+</ul>
+<h3 id="logging-output">Logging Output</h3>
+<p>The service now logs detailed initialization information:</p>
+<pre><code>Object detection initialized with CPU using X processors
+  - Graph optimization: ALL
+  - Execution mode: PARALLEL
+  - InterOp threads: Y
+  - IntraOp threads: Z
+  - Memory optimizations: Enabled</code></pre>
+<h2 id="best-practices">Best Practices</h2>
+<ol type="1">
+<li><strong>Input Images</strong>: Ensure images are of reasonable quality</li>
+<li><strong>Batch Processing</strong>: Process multiple images sequentially for consistent performance</li>
+<li><strong>Thread Count</strong>: The automatic calculation (half of CPU cores) is optimal for most scenarios</li>
+<li><strong>Model Selection</strong>: MobileNetV2 provides good balance between accuracy and speed</li>
+</ol>
+<h2 id="future-optimization-options">Future Optimization Options</h2>
+<p>If even better performance is needed:</p>
+<ol type="1">
+<li><p><strong>GPU Acceleration</strong>: Install <code>Microsoft.ML.OnnxRuntime.Gpu</code> package</p>
+<ul>
+<li>Requires CUDA-capable GPU</li>
+<li>Significantly faster for large batch processing</li>
+</ul></li>
+<li><p><strong>Model Quantization</strong>: Use INT8 quantized version of MobileNetV2</p>
+<ul>
+<li>Smaller model size</li>
+<li>Faster inference</li>
+<li>Minimal accuracy loss</li>
+</ul></li>
+<li><p><strong>TensorRT Execution Provider</strong>: For NVIDIA GPUs</p>
+<ul>
+<li>Additional optimization layer</li>
+<li>Best performance on NVIDIA hardware</li>
+</ul></li>
+<li><p><strong>DirectML Execution Provider</strong>: For Windows GPU acceleration</p>
+<ul>
+<li>Works with any DirectX 12 compatible GPU</li>
+<li>Good cross-vendor GPU support</li>
+</ul></li>
+</ol>
+<h2 id="references">References</h2>
+<ul>
+<li><a href="https://onnxruntime.ai/docs/performance/tune-performance.html">ONNX Runtime Performance Tuning</a></li>
+<li><a href="https://arxiv.org/abs/1801.04381">MobileNetV2 Paper</a></li>
+<li><a href="https://www.image-net.org/">ImageNet Classification</a></li>
+</ul>
+<footer class="docweave-footer">
+<div class="backlinks">
+<strong>Referenced by:</strong> 
+<a href="index.html">CoilViewer</a>
+</div>
+<div class="docweave-credit">Generated by docweave</div>
+</footer>
+</body>
+</html>
