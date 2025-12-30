@@ -3,6 +3,7 @@ using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System;
 
@@ -24,6 +25,9 @@ public partial class App : System.Windows.Application
         var totalTimer = Stopwatch.StartNew();
         var stepTimer = Stopwatch.StartNew();
 
+        // Log .NET runtime information immediately after startup to diagnose version issues
+        LogRuntimeEnvironmentInfo();
+        
         base.OnStartup(e);
         Logger.Log($"[STARTUP] base.OnStartup: {stepTimer.ElapsedMilliseconds}ms");
         
@@ -168,6 +172,45 @@ public partial class App : System.Windows.Application
         }
 
         return null;
+    }
+
+    private static void LogRuntimeEnvironmentInfo()
+    {
+        try
+        {
+            var runtimeVersion = Environment.Version.ToString();
+            var frameworkDescription = RuntimeInformation.FrameworkDescription;
+            var osDescription = RuntimeInformation.OSDescription;
+            var processArchitecture = RuntimeInformation.ProcessArchitecture;
+            var osArchitecture = RuntimeInformation.OSArchitecture;
+            var baseDirectory = AppContext.BaseDirectory;
+            var runtimeConfigPath = Path.Combine(baseDirectory, "CoilViewer.runtimeconfig.json");
+            var runtimeConfigExists = File.Exists(runtimeConfigPath);
+            
+            Logger.Log($"[RUNTIME-ENV] Framework: {frameworkDescription}");
+            Logger.Log($"[RUNTIME-ENV] Environment.Version: {runtimeVersion}");
+            Logger.Log($"[RUNTIME-ENV] Process Architecture: {processArchitecture}");
+            Logger.Log($"[RUNTIME-ENV] OS: {osDescription} ({osArchitecture})");
+            Logger.Log($"[RUNTIME-ENV] BaseDirectory: {baseDirectory}");
+            Logger.Log($"[RUNTIME-ENV] RuntimeConfig exists: {runtimeConfigExists}");
+            
+            if (runtimeConfigExists)
+            {
+                try
+                {
+                    var runtimeConfigContent = File.ReadAllText(runtimeConfigPath);
+                    Logger.Log($"[RUNTIME-ENV] RuntimeConfig.json contents: {runtimeConfigContent}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to read runtimeconfig.json", ex);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Failed to log runtime environment info", ex);
+        }
     }
 }
 

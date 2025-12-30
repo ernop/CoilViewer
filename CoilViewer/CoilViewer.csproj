@@ -12,8 +12,9 @@
     <GeneratedVersionFile>$(GeneratedVersionOutputDir)BuildVersionInfo.g.cs</GeneratedVersionFile>
     <ApplicationIcon>Assets\CoilViewer.ico</ApplicationIcon>
     <NoWarn>$(NoWarn);CS2002</NoWarn>
-    <RuntimeFrameworkVersion>8.0.20</RuntimeFrameworkVersion>
-    <WindowsDesktopSharedFrameworkVersion>8.0.20</WindowsDesktopSharedFrameworkVersion>
+    <!-- RuntimeFrameworkVersion and WindowsDesktopSharedFrameworkVersion removed to allow roll-forward -->
+    <!-- By default, .NET will use roll-forward policy to find compatible runtime versions -->
+    <!-- This prevents "you need .NET 8" errors when exact patch version is not installed -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     
     <!-- Aggressive startup performance optimizations -->
@@ -28,6 +29,14 @@
     <PublishReadyToRun>true</PublishReadyToRun>
     <PublishReadyToRunComposite>true</PublishReadyToRunComposite>
   </PropertyGroup>
+
+  <!-- Diagnostic target to log runtime framework detection -->
+  <Target Name="LogRuntimeFrameworkInfo" BeforeTargets="BeforeBuild">
+    <Message Importance="High" Text="[RUNTIME-DIAG] TargetFramework: $(TargetFramework)" />
+    <Message Importance="High" Text="[RUNTIME-DIAG] RuntimeFrameworkVersion: $(RuntimeFrameworkVersion)" />
+    <Message Importance="High" Text="[RUNTIME-DIAG] WindowsDesktopSharedFrameworkVersion: $(WindowsDesktopSharedFrameworkVersion)" />
+    <Message Importance="High" Text="[RUNTIME-DIAG] Note: If RuntimeFrameworkVersion is empty, .NET will use roll-forward policy" />
+  </Target>
 
   <Target Name="IncrementBuildCounter" BeforeTargets="BeforeBuild">
     <PropertyGroup>
