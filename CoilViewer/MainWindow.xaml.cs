@@ -778,8 +778,6 @@ public partial class MainWindow : Window
             SetOverlayVisibility(false, animate: false);
             UpdateContextMenu();
             _fitScale = MinZoom;
-            ImageFitTransform.ScaleX = _fitScale;
-            ImageFitTransform.ScaleY = _fitScale;
             SetZoom(_fitScale);
             ShowMessage("No images remain.");
             UpdateWindowTitle();
@@ -1905,38 +1903,64 @@ public partial class MainWindow : Window
         var fit = Math.Max(_fitScale, 0.01);
         var clamped = Math.Clamp(scale, fit, MaxZoom);
 
-        var hadViewport = TryGetViewportSize(out var viewportWidth, out var viewportHeight);
-        var previousRelative = ImageZoomTransform.ScaleX;
-        if (double.IsNaN(previousRelative) || previousRelative <= 0)
+        Logger.Log($"SetZoom: requested={scale:F4}, fit={fit:F4}, clamped={clamped:F4}, _fitScale={_fitScale:F4}, _zoomScale={_zoomScale:F4}");
+
+        var previousScale = _zoomScale;
+        if (double.IsNaN(previousScale) || previousScale <= 0)
         {
-            previousRelative = 1.0;
+            previousScale = fit;
         }
 
-        Vector viewportVector = new();
-        Vector imageVector = new();
+        // Capture current scroll state before scaling.
+        var viewportOk = TryGetViewportSize(out var viewportW, out var viewportH);
+        var anchorPoint = anchor;
+        if (!viewportOk)
+        {
+            anchorPoint = null;
+        }
 
-        if (anchor.HasValue && hadViewport)
-        {
-            var anchorPoint = anchor.Value;
-            viewportVector = new Vector(anchorPoint.X - viewportWidth * 0.5, anchorPoint.Y - viewportHeight * 0.5);
-            imageVector = (viewportVector + _panOffset) / previousRelative;
-        }
-        else if (hadViewport)
-        {
-            viewportVector = new Vector(0, 0);
-            imageVector = _panOffset / previousRelative;
-        }
+        var anchorX = anchorPoint?.X ?? (viewportW * 0.5);
+        var anchorY = anchorPoint?.Y ?? (viewportH * 0.5);
+
+        var oldOffsetX = ImageScrollViewer.HorizontalOffset;
+        var oldOffsetY = ImageScrollViewer.VerticalOffset;
+
+        // Content-coordinate of the anchor before zoom.
+        var anchorContentX = oldOffsetX + anchorX;
+        var anchorContentY = oldOffsetY + anchorY;
 
         _zoomScale = clamped;
 
-        var relative = clamped / fit;
-        ImageZoomTransform.ScaleX = relative;
-        ImageZoomTransform.ScaleY = relative;
+        // Apply zoom via layout transform.
+        ImageScaleTransform.ScaleX = clamped;
+        ImageScaleTransform.ScaleY = clamped;
 
-        if (anchor.HasValue && hadViewport)
+        // Force layout so ScrollViewer recomputes extents/scrollable range.
+        ImageScrollViewer.UpdateLayout();
+
+        // Preserve the same anchor content point under the cursor/center.
+        if (previousScale > 0)
         {
-            var newPan = imageVector * relative - viewportVector;
-            ApplyPan(newPan.X, newPan.Y);
+            var ratio = clamped / previousScale;
+            var newAnchorContentX = anchorContentX * ratio;
+            var newAnchorContentY = anchorContentY * ratio;
+
+            var newOffsetX = newAnchorContentX - anchorX;
+            var newOffsetY = newAnchorContentY - anchorY;
+
+            var scrollableW = ImageScrollViewer.ScrollableWidth;
+            var scrollableH = ImageScrollViewer.ScrollableHeight;
+            if (double.IsNaN(scrollableW) || scrollableW < 0) scrollableW = 0;
+            if (double.IsNaN(scrollableH) || scrollableH < 0) scrollableH = 0;
+
+            newOffsetX = Math.Clamp(newOffsetX, 0, scrollableW);
+            newOffsetY = Math.Clamp(newOffsetY, 0, scrollableH);
+
+            ImageScrollViewer.ScrollToHorizontalOffset(newOffsetX);
+            ImageScrollViewer.ScrollToVerticalOffset(newOffsetY);
+
+            // Update centered pan cache.
+            _panOffset = new Vector(newOffsetX - scrollableW * 0.5, newOffsetY - scrollableH * 0.5);
         }
         else
         {
@@ -1956,10 +1980,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        double viewportWidth = ImageScrollViewer.ViewportWidth;
-        double viewportHeight = ImageScrollViewer.ViewportHeight;
-
-        if (viewportWidth <= 0 || viewportHeight <= 0 || double.IsNaN(viewportWidth) || double.IsNaN(viewportHeight))
+        if (!TryGetViewportSize(out double viewportWidth, out double viewportHeight))
         {
             Dispatcher.BeginInvoke(new Action(() => UpdateFitScale(bitmap, forceReset)), DispatcherPriority.Loaded);
             return;
@@ -1984,8 +2005,7 @@ public partial class MainWindow : Window
 
         bool wasZoomed = _zoomScale > _fitScale + 0.001;
         _fitScale = Math.Max(computed, 0.01);
-        ImageFitTransform.ScaleX = _fitScale;
-        ImageFitTransform.ScaleY = _fitScale;
+        // No separate fit transform - SetZoom handles the combined scale
 
         if (forceReset || !wasZoomed)
         {
@@ -2000,13 +2020,13 @@ public partial class MainWindow : Window
 
     private double GetPanSpeedMultiplier()
     {
-        var scale = ImageZoomTransform.ScaleX;
-        if (double.IsNaN(scale) || scale <= 0)
+        // Scale pan speed with zoom level (relative to fit)
+        if (_fitScale <= 0)
         {
             return 1.0;
         }
-
-        return Math.Max(1.0, scale);
+        var relativeZoom = _zoomScale / _fitScale;
+        return Math.Max(1.0, relativeZoom);
     }
 
     private void BeginSmoothPan(Key key)
@@ -2225,8 +2245,23 @@ public partial class MainWindow : Window
 
         if (TryGetPanLimits(out var maxX, out var maxY))
         {
+            var requestedX = panX;
+            var requestedY = panY;
             panX = Math.Clamp(panX, -maxX, maxX);
             panY = Math.Clamp(panY, -maxY, maxY);
+
+            if (panX != requestedX || panY != requestedY)
+            {
+                if (TryGetContentSize(out var contentW, out var contentH) &&
+                    TryGetViewportSize(out var viewportW, out var viewportH))
+                {
+                    Logger.Log($"PAN clamp: requested=({requestedX:F2},{requestedY:F2}) -> clamped=({panX:F2},{panY:F2}) max=({maxX:F2},{maxY:F2}) content=({contentW:F2},{contentH:F2}) viewport=({viewportW:F2},{viewportH:F2}) zoomScale={_zoomScale:F4} fitScale={_fitScale:F4}");
+                }
+                else
+                {
+                    Logger.Log($"PAN clamp: requested=({requestedX:F2},{requestedY:F2}) -> clamped=({panX:F2},{panY:F2}) max=({maxX:F2},{maxY:F2}) zoomScale={_zoomScale:F4} fitScale={_fitScale:F4}");
+                }
+            }
         }
         else
         {
@@ -2235,8 +2270,27 @@ public partial class MainWindow : Window
         }
 
         _panOffset = new Vector(panX, panY);
-        ImagePanTransform.X = -panX;
-        ImagePanTransform.Y = -panY;
+
+        // Apply pan by scrolling (centered pan coordinates).
+        // centeredPan = scrollOffset - scrollable/2
+        var scrollableW = ImageScrollViewer.ScrollableWidth;
+        var scrollableH = ImageScrollViewer.ScrollableHeight;
+
+        if (double.IsNaN(scrollableW) || scrollableW < 0)
+        {
+            scrollableW = 0;
+        }
+
+        if (double.IsNaN(scrollableH) || scrollableH < 0)
+        {
+            scrollableH = 0;
+        }
+
+        var targetHorizontal = Math.Clamp(panX + scrollableW * 0.5, 0, scrollableW);
+        var targetVertical = Math.Clamp(panY + scrollableH * 0.5, 0, scrollableH);
+
+        ImageScrollViewer.ScrollToHorizontalOffset(targetHorizontal);
+        ImageScrollViewer.ScrollToVerticalOffset(targetVertical);
     }
 
     private bool TryGetPanLimits(out double maxX, out double maxY)
@@ -2249,40 +2303,38 @@ public partial class MainWindow : Window
             return false;
         }
 
-        if (!TryGetViewportSize(out double viewportWidth, out double viewportHeight))
+        // Use ScrollViewer's computed scrollable extents.
+        // Convert to centered pan limits (half of scrollable range).
+        var scrollableW = ImageScrollViewer.ScrollableWidth;
+        var scrollableH = ImageScrollViewer.ScrollableHeight;
+
+        if (double.IsNaN(scrollableW) || scrollableW < 0)
         {
-            return false;
+            scrollableW = 0;
         }
 
-        if (!TryGetContentSize(out double contentWidth, out double contentHeight))
+        if (double.IsNaN(scrollableH) || scrollableH < 0)
         {
-            return false;
+            scrollableH = 0;
         }
 
-        var overflowWidth = contentWidth - viewportWidth;
-        var overflowHeight = contentHeight - viewportHeight;
-
-        maxX = overflowWidth > 0 ? overflowWidth * 0.5 : 0;
-        maxY = overflowHeight > 0 ? overflowHeight * 0.5 : 0;
+        maxX = scrollableW * 0.5;
+        maxY = scrollableH * 0.5;
         return true;
     }
 
     private bool TryGetViewportSize(out double width, out double height)
     {
-        width = ImageScrollViewer.ViewportWidth;
-        height = ImageScrollViewer.ViewportHeight;
+        var vw = ImageScrollViewer.ViewportWidth;
+        var vh = ImageScrollViewer.ViewportHeight;
+        var aw = ImageScrollViewer.ActualWidth;
+        var ah = ImageScrollViewer.ActualHeight;
 
-        if (double.IsNaN(width) || width <= 0)
-        {
-            width = ImageScrollViewer.ActualWidth;
-        }
+        // In some layout states Viewport* may be 0 briefly; use the larger of viewport/actual.
+        width = Math.Max(vw, aw);
+        height = Math.Max(vh, ah);
 
-        if (double.IsNaN(height) || height <= 0)
-        {
-            height = ImageScrollViewer.ActualHeight;
-        }
-
-        if (width <= 0 || height <= 0)
+        if (width <= 0 || height <= 0 || double.IsNaN(width) || double.IsNaN(height))
         {
             width = 0;
             height = 0;
@@ -2294,30 +2346,34 @@ public partial class MainWindow : Window
 
     private bool TryGetContentSize(out double width, out double height)
     {
-        width = ImageDisplay.RenderSize.Width;
-        height = ImageDisplay.RenderSize.Height;
+        // Prefer ScrollViewer extent (post-layout), fall back to computed value.
+        width = ImageScrollViewer.ExtentWidth;
+        height = ImageScrollViewer.ExtentHeight;
 
-        if (double.IsNaN(width) || width <= 0 || double.IsNaN(height) || height <= 0)
+        if (!double.IsNaN(width) && width > 0 && !double.IsNaN(height) && height > 0)
         {
-            if (_currentBitmap == null)
-            {
-                width = 0;
-                height = 0;
-                return false;
-            }
-
-            width = PixelsToDip(_currentBitmap.PixelWidth, _currentBitmap.DpiX) * _fitScale;
-            height = PixelsToDip(_currentBitmap.PixelHeight, _currentBitmap.DpiY) * _fitScale;
+            return true;
         }
 
-        var zoomFactor = ImageZoomTransform.ScaleX;
-        if (double.IsNaN(zoomFactor) || zoomFactor <= 0)
+        width = 0;
+        height = 0;
+
+        if (_currentBitmap == null)
         {
-            zoomFactor = 1.0;
+            return false;
         }
 
-        width *= zoomFactor;
-        height *= zoomFactor;
+        double bitmapWidthDip = PixelsToDip(_currentBitmap.PixelWidth, _currentBitmap.DpiX);
+        double bitmapHeightDip = PixelsToDip(_currentBitmap.PixelHeight, _currentBitmap.DpiY);
+
+        var scale = _zoomScale;
+        if (double.IsNaN(scale) || scale <= 0)
+        {
+            scale = _fitScale > 0 ? _fitScale : 1.0;
+        }
+
+        width = bitmapWidthDip * scale;
+        height = bitmapHeightDip * scale;
         return true;
     }
 
@@ -2633,5 +2689,56 @@ public partial class MainWindow : Window
             OriginalPath = originalPath;
             ArchivedPath = archivedPath;
         }
+    }
+
+    // ===== Self-test helpers (no UI interaction) =====
+    // These are intentionally internal and side-effectful to enable automated verification
+    // of zoom/pan behavior without manual testing.
+
+    internal void DebugLoadBitmapForSelfTest(BitmapSource bitmap)
+    {
+        _currentBitmap = bitmap;
+        ImageDisplay.Source = bitmap;
+        HideMessage();
+        UpdateFitScale(bitmap, forceReset: true);
+        // Ensure transforms are applied.
+        UpdateLayout();
+    }
+
+    internal double DebugGetFitScale() => _fitScale;
+
+    internal Rect DebugGetViewportRect()
+    {
+        _ = TryGetViewportSize(out var w, out var h);
+        return new Rect(0, 0, w, h);
+    }
+
+    internal Vector DebugGetPanOffset() => _panOffset;
+
+    internal Rect DebugGetImageBoundsInViewport()
+    {
+        // Bounds of the Image element in the coordinate space of the viewport container.
+        var rect = new Rect(0, 0, ImageDisplay.ActualWidth, ImageDisplay.ActualHeight);
+        try
+        {
+            var t = ImageDisplay.TransformToAncestor(ImageScrollViewer);
+            return t.TransformBounds(rect);
+        }
+        catch
+        {
+            return Rect.Empty;
+        }
+    }
+
+    internal void DebugSetZoomForSelfTest(double scale)
+    {
+        SetZoom(scale, anchor: null);
+        UpdateLayout();
+    }
+
+    internal void DebugSetPanForSelfTest(double panX, double panY)
+    {
+        ApplyPan(panX, panY);
+        UpdateLayout();
     }
 }

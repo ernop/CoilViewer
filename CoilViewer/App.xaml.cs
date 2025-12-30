@@ -1,4 +1,4 @@
-﻿using System.Configuration;
+using System.Configuration;
 using System.Data;
 using System.Diagnostics;
 using System.IO;
@@ -34,6 +34,17 @@ public partial class App : System.Windows.Application
         stepTimer.Restart();
         Logger.LogLaunch(e.Args);
         Logger.Log($"[STARTUP] Logger.LogLaunch: {stepTimer.ElapsedMilliseconds}ms");
+
+        // Self-test mode: run deterministic zoom/pan checks without showing UI.
+        // Usage: CoilViewer.exe --selftest
+        if (e.Args.Any(a => string.Equals(a, "--selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            stepTimer.Restart();
+            var ok = ZoomPanSelfTest.Run();
+            Logger.Log($"[STARTUP] ZoomPanSelfTest.Run ok={ok}: {stepTimer.ElapsedMilliseconds}ms");
+            Shutdown(ok ? 0 : 1);
+            return;
+        }
 
         stepTimer.Restart();
         var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
