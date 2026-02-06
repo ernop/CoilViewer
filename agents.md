@@ -91,10 +91,10 @@ Windows will then launch Coil Viewer for that extension. Repeat for additional i
 
 ## Performance & Optimization
 
-- [Startup Optimization Report](STARTUP_OPTIMIZATION_REPORT.md) - Performance analysis and optimizations
-- [Startup Timing Instrumentation](STARTUP_TIMING_INSTRUMENTATION.md) - How startup timing is measured
-- [Native AOT Explained](NATIVE_AOT_EXPLAINED.md) - Ahead-of-time compilation details
-- [.NET Runtime Version Issue](NET_RUNTIME_VERSION_ISSUE.md) - Runtime compatibility notes
+- [Startup Optimization Report](docs/technical/startup-optimization-report.md) - Performance analysis and optimizations
+- [Startup Timing Instrumentation](docs/technical/startup-timing-instrumentation.md) - How startup timing is measured
+- [Native AOT Explained](docs/technical/native-aot-explained.md) - Ahead-of-time compilation details
+- [.NET Runtime Version Issue](docs/technical/net-runtime-version-issue.md) - Runtime compatibility notes
 
 ## Machine Learning Features
 
@@ -102,20 +102,20 @@ CoilViewer supports optional AI-powered image filtering using ONNX models.
 
 ### Setup Guides
 
-- [NSFW Detection Setup](NSFW_DETECTION_SETUP.md) - How to enable NSFW filtering
-- [Model Download Guide](MODEL_DOWNLOAD_GUIDE.md) - Where to get the ML models
-- [Model Testing Guide](MODEL_TESTING_GUIDE.md) - How to verify models work correctly
+- [NSFW Detection Setup](docs/guides/nsfw-detection-setup.md) - How to enable NSFW filtering
+- [Model Download Guide](docs/guides/model-download-guide.md) - Where to get the ML models
+- [Model Testing Guide](docs/guides/model-testing-guide.md) - How to verify models work correctly
 
 ### Technical Details
 
-- [ML Model Interaction](ML_MODEL_INTERACTION.md) - How the app interfaces with ONNX models
-- [Object Detection Optimization](OBJECT_DETECTION_OPTIMIZATION.md) - Performance tuning for inference
-- [Object Detection Input Size Guide](OBJECT_DETECTION_INPUT_SIZE_GUIDE.md) - Input preprocessing details
-- [Object Detection Changes Summary](OBJECT_DETECTION_CHANGES_SUMMARY.md) - Recent changes to detection code
-- [Input Size Implementation Summary](INPUT_SIZE_IMPLEMENTATION_SUMMARY.md) - Input sizing implementation details
-- [Models Moved Summary](MODELS_MOVED_SUMMARY.md) - Model file location changes
+- [ML Model Interaction](docs/technical/ml-model-interaction.md) - How the app interfaces with ONNX models
+- [Object Detection Optimization](docs/technical/object-detection-optimization.md) - Performance tuning for inference
+- [Object Detection Input Size Guide](docs/technical/object-detection-input-size-guide.md) - Input preprocessing details
+- [Object Detection Changes Summary](docs/technical/object-detection-changes-summary.md) - Recent changes to detection code
+- [Input Size Implementation Summary](docs/technical/input-size-implementation-summary.md) - Input sizing implementation details
+- [Models Moved Summary](docs/technical/models-moved-summary.md) - Model file location changes
 
 ## Development Notes
 
-- [Zoom/Pan Postmortem](ZOOM_PAN_POSTMORTEM.md) - Lessons from implementing zoom/pan
-- [Zoom/Pan Postmortem (Extended)](zoom_pan_postmortem_opus_view.md) - Detailed technical analysis
+- [Zoom/Pan Postmortem](docs/postmortems/zoom-pan-postmortem.md) - Lessons from implementing zoom/pan
+- [Zoom/Pan Postmortem (Extended)](docs/postmortems/zoom-pan-postmortem-extended.md) - Detailed technical analysis

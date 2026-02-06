@@ -120,5 +120,5 @@ public sealed class ViewerConfig
     public int ObjectDetectionInputSize { get; set; } = 0; // 0 = auto-detect, or specify size (e.g. 224, 299, 384, 512)
     public string ObjectFilterMode { get; set; } = "ShowAll";
     public string ObjectFilterText { get; set; } = string.Empty;
-    public float ObjectFilterThreshold { get; set; } = 0.3f;
+    public float ObjectFilterThreshold { get; set; } = 0.1f;
 }

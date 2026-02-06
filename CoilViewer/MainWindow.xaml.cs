@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
@@ -76,6 +76,7 @@ public partial class MainWindow : Window
     private readonly Stack<ArchiveStep> _archiveHistory = new();
     private readonly DispatcherTimer _statusTimer;
     private static readonly TimeSpan StatusDisplayDuration = TimeSpan.FromSeconds(2.5);
+    private const int MaxArchiveHistorySize = 200;
     private const string QuadraticHintTag = "QuadraticHint";
     private bool _isQuadraticHintVisible;
     private readonly record struct ArchiveAction(string OriginalPath, string ArchivedPath);
@@ -86,6 +87,7 @@ public partial class MainWindow : Window
         var stepTimer = Stopwatch.StartNew();
 
         InitializeComponent();
+        Logger.Log($"[MAINWINDOW] Build {BuildVersion.VersionString} (counter={BuildVersion.Counter})");
         Logger.Log($"[MAINWINDOW] InitializeComponent: {stepTimer.ElapsedMilliseconds}ms");
 
         stepTimer.Restart();
@@ -418,11 +420,11 @@ public partial class MainWindow : Window
 
     private void UpdateWindowTitle()
     {
-        string title = "Coil Viewer";
+        string title = $"Coil Viewer v{BuildVersion.VersionString}";
         var directory = _sequence.DirectoryPath;
         if (!string.IsNullOrEmpty(directory))
         {
-            title = $"Coil Viewer — {directory}";
+            title = $"Coil Viewer v{BuildVersion.VersionString} — {directory}";
         }
 
         if (_sequence.HasImages)
@@ -790,6 +792,7 @@ public partial class MainWindow : Window
             {
                 await Task.Run(() => File.Move(currentPath, targetPath));
                 _archiveHistory.Push(new ArchiveStep(currentPath, targetPath));
+                TrimArchiveHistory();
                 Logger.Log($"Moved image '{currentPath}' to '{targetPath}'");
                 Dispatcher.Invoke(() => ShowStatus($"Moved to '{targetPath}'."));
             }
@@ -845,6 +848,22 @@ public partial class MainWindow : Window
             _archiveHistory.Push(action);
             Logger.LogError($"Failed to undo archive for '{action.OriginalPath}' from '{action.ArchivedPath}'", ex);
             ShowStatus("Failed to undo archive.");
+        }
+    }
+
+    private void TrimArchiveHistory()
+    {
+        if (_archiveHistory.Count <= MaxArchiveHistorySize)
+        {
+            return;
+        }
+
+        // Stack has no RemoveAt; rebuild keeping only the most recent entries.
+        var items = _archiveHistory.ToArray();
+        _archiveHistory.Clear();
+        for (int i = MaxArchiveHistorySize - 1; i >= 0; i--)
+        {
+            _archiveHistory.Push(items[i]);
         }
     }
 
@@ -1200,6 +1219,7 @@ public partial class MainWindow : Window
             Logger.Log($"[LOADSEQUENCE] _sequence.LoadFromPath: {stepTimer.ElapsedMilliseconds}ms");
             
             stepTimer.Restart();
+            _detectionCache.Clear();
             _cache = new ImageCache(_sequence, _config);
             Logger.Log($"[LOADSEQUENCE] Create ImageCache: {stepTimer.ElapsedMilliseconds}ms");
             
@@ -1579,6 +1599,25 @@ public partial class MainWindow : Window
             var pixelFormat = source.Format;
             var width = source.PixelWidth;
             var height = source.PixelHeight;
+
+            // Indexed pixel formats (e.g. Indexed8 from GIF/palettized PNG) require a
+            // palette when constructing a WriteableBitmap.  Convert them to Bgra32 to
+            // avoid the "Must specify a palette" exception and to produce a universally
+            // compatible bitmap for clipboard / encoding operations.
+            if (pixelFormat == PixelFormats.Indexed1 ||
+                pixelFormat == PixelFormats.Indexed2 ||
+                pixelFormat == PixelFormats.Indexed4 ||
+                pixelFormat == PixelFormats.Indexed8 ||
+                pixelFormat == PixelFormats.BlackWhite ||
+                pixelFormat == PixelFormats.Gray2 ||
+                pixelFormat == PixelFormats.Gray4)
+            {
+                var converted = new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
+                converted.Freeze();
+                source = converted;
+                pixelFormat = PixelFormats.Bgra32;
+            }
+
             var stride = (width * pixelFormat.BitsPerPixel + 7) / 8;
             var pixels = new byte[height * stride];
 
@@ -1925,10 +1964,6 @@ public partial class MainWindow : Window
         var oldOffsetX = ImageScrollViewer.HorizontalOffset;
         var oldOffsetY = ImageScrollViewer.VerticalOffset;
 
-        // Content-coordinate of the anchor before zoom.
-        var anchorContentX = oldOffsetX + anchorX;
-        var anchorContentY = oldOffsetY + anchorY;
-
         _zoomScale = clamped;
 
         // Apply zoom via layout transform.
@@ -1939,27 +1974,47 @@ public partial class MainWindow : Window
         ImageScrollViewer.UpdateLayout();
 
         // Preserve the same anchor content point under the cursor/center.
-        if (previousScale > 0)
+        // Delegate to ZoomPanMath which computes content sizes from the bitmap's
+        // DIP dimensions rather than from ScrollViewer.ExtentWidth/Height.
+        // WPF's ScrollViewer pads Extent to at least the viewport size when
+        // content is smaller, which corrupts the centering-gap calculation.
+        if (previousScale > 0 && _currentBitmap != null)
         {
-            var ratio = clamped / previousScale;
-            var newAnchorContentX = anchorContentX * ratio;
-            var newAnchorContentY = anchorContentY * ratio;
+            var imageDipW = PixelsToDip(_currentBitmap.PixelWidth, _currentBitmap.DpiX);
+            var imageDipH = PixelsToDip(_currentBitmap.PixelHeight, _currentBitmap.DpiY);
 
-            var newOffsetX = newAnchorContentX - anchorX;
-            var newOffsetY = newAnchorContentY - anchorY;
+            Logger.Log($"SetZoom detail: prevScale={previousScale:F6}, newScale={clamped:F6}, " +
+                $"viewport=({viewportW:F1},{viewportH:F1}), oldOffset=({oldOffsetX:F2},{oldOffsetY:F2}), " +
+                $"imageDip=({imageDipW:F1},{imageDipH:F1}), anchor=({anchorX:F1},{anchorY:F1}), " +
+                $"extentWH=({ImageScrollViewer.ExtentWidth:F1},{ImageScrollViewer.ExtentHeight:F1}), " +
+                $"scrollableWH=({ImageScrollViewer.ScrollableWidth:F1},{ImageScrollViewer.ScrollableHeight:F1})");
 
+            var (newOffsetX, newOffsetY) = ZoomPanMath.ComputeScrollOffsetsAfterZoom(
+                anchorX, anchorY,
+                viewportW, viewportH,
+                oldOffsetX, oldOffsetY,
+                previousScale, clamped,
+                imageDipW, imageDipH);
+
+            Logger.Log($"SetZoom result: newOffset=({newOffsetX:F2},{newOffsetY:F2})");
+
+            ImageScrollViewer.ScrollToHorizontalOffset(newOffsetX);
+            ImageScrollViewer.ScrollToVerticalOffset(newOffsetY);
+
+            // Verify the offsets were applied (deferred to after layout settles).
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                Logger.Log($"SetZoom verify: actualOffset=({ImageScrollViewer.HorizontalOffset:F2},{ImageScrollViewer.VerticalOffset:F2}), " +
+                    $"scrollableWH=({ImageScrollViewer.ScrollableWidth:F1},{ImageScrollViewer.ScrollableHeight:F1})");
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+
+            // Update centered pan cache using ScrollViewer's own scrollable range
+            // (ApplyPan reads ScrollableWidth/Height, so _panOffset must match).
             var scrollableW = ImageScrollViewer.ScrollableWidth;
             var scrollableH = ImageScrollViewer.ScrollableHeight;
             if (double.IsNaN(scrollableW) || scrollableW < 0) scrollableW = 0;
             if (double.IsNaN(scrollableH) || scrollableH < 0) scrollableH = 0;
 
-            newOffsetX = Math.Clamp(newOffsetX, 0, scrollableW);
-            newOffsetY = Math.Clamp(newOffsetY, 0, scrollableH);
-
-            ImageScrollViewer.ScrollToHorizontalOffset(newOffsetX);
-            ImageScrollViewer.ScrollToVerticalOffset(newOffsetY);
-
-            // Update centered pan cache.
             _panOffset = new Vector(newOffsetX - scrollableW * 0.5, newOffsetY - scrollableH * 0.5);
         }
         else

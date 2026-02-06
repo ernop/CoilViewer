@@ -15,6 +15,7 @@ TestResults/
 
 # Logs and diagnostics
 *.log
+*.log.old
 *.dmp
 *.etl
 

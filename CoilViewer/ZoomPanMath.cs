@@ -68,18 +68,26 @@ internal static class ZoomPanMath
         // Clamp old offsets.
         var oldClamped = ClampScrollOffsets(oldOffsetX, oldOffsetY, oldScrollableW, oldScrollableH);
 
-        // Content coordinate of the anchor before zoom.
-        var anchorContentX = oldClamped.x + anchorXInViewport;
-        var anchorContentY = oldClamped.y + anchorYInViewport;
+        // When content is smaller than the viewport, the ScrollViewer centers it.
+        // The centering gap must be subtracted to convert a viewport-space anchor
+        // into a content-space coordinate.
+        var oldGapX = Math.Max(0, (viewportW - oldContentW) * 0.5);
+        var oldGapY = Math.Max(0, (viewportH - oldContentH) * 0.5);
+
+        var anchorContentX = oldClamped.x + anchorXInViewport - oldGapX;
+        var anchorContentY = oldClamped.y + anchorYInViewport - oldGapY;
 
         // Scale around content origin.
         var ratio = newScale / oldScale;
         var newAnchorContentX = anchorContentX * ratio;
         var newAnchorContentY = anchorContentY * ratio;
 
-        // Solve offsets so that same content point remains under the anchor.
-        var newOffsetX = newAnchorContentX - anchorXInViewport;
-        var newOffsetY = newAnchorContentY - anchorYInViewport;
+        // Account for the new centering gap after zoom.
+        var newGapX = Math.Max(0, (viewportW - newContentW) * 0.5);
+        var newGapY = Math.Max(0, (viewportH - newContentH) * 0.5);
+
+        var newOffsetX = newAnchorContentX - anchorXInViewport + newGapX;
+        var newOffsetY = newAnchorContentY - anchorYInViewport + newGapY;
 
         var newClamped = ClampScrollOffsets(newOffsetX, newOffsetY, newScrollableW, newScrollableH);
         return (newClamped.x, newClamped.y);
