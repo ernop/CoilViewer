@@ -136,7 +136,7 @@ Let's say you have a 4K image (3840x2160) and want to detect objects:
 
 ## Checking the Logs
 
-After changing the input size, launch CoilViewer and check `coilviewer-launch.log`:
+After changing the input size, launch CoilViewer and check `CoilViewer-launch.log`:
 
 ```
 Object detection initialized with CPU...

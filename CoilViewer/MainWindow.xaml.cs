@@ -62,6 +62,8 @@ public partial class MainWindow : Window
     private bool _overlayVisible;
     private bool _shortcutsVisible;
     private bool _filterPanelVisible;
+    private bool _filterControlsInitialized;
+    private string? _pendingInitialPath;
     private double _fitScale = MinZoom;
     private double _zoomScale = MinZoom;
     private BitmapSource? _currentBitmap;
@@ -75,6 +77,8 @@ public partial class MainWindow : Window
     private TimeSpan _smoothPanLastTick = TimeSpan.Zero;
     private readonly Stack<ArchiveStep> _archiveHistory = new();
     private readonly DispatcherTimer _statusTimer;
+    private FileSystemWatcher? _folderWatcher;
+    private readonly DispatcherTimer _folderRescanTimer;
     private static readonly TimeSpan StatusDisplayDuration = TimeSpan.FromSeconds(2.5);
     private const int MaxArchiveHistorySize = 200;
     private const string QuadraticHintTag = "QuadraticHint";
@@ -98,6 +102,8 @@ public partial class MainWindow : Window
         _directoryGuard?.SetRequestHandler(OnExternalOpenRequest);
         _statusTimer = new DispatcherTimer { Interval = StatusDisplayDuration };
         _statusTimer.Tick += OnStatusTimerTick;
+        _folderRescanTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        _folderRescanTimer.Tick += OnFolderRescanTick;
         Logger.Log($"[MAINWINDOW] Field initialization: {stepTimer.ElapsedMilliseconds}ms");
 
         stepTimer.Restart();
@@ -107,27 +113,43 @@ public partial class MainWindow : Window
         stepTimer.Restart();
         UpdateContextMenu();
         Logger.Log($"[MAINWINDOW] UpdateContextMenu: {stepTimer.ElapsedMilliseconds}ms");
-        
-        stepTimer.Restart();
-        InitializeFilterControls();
-        Logger.Log($"[MAINWINDOW] InitializeFilterControls: {stepTimer.ElapsedMilliseconds}ms");
 
         Loaded += (_, _) => Focus();
 
-        stepTimer.Restart();
-        if (!string.IsNullOrWhiteSpace(initialPath))
+        // Defer filter UI wiring and directory load until after the first paint so
+        // window.Show() is not blocked by enumeration or filter panel setup.
+        _pendingInitialPath = initialPath;
+        ContentRendered += OnStartupContentRendered;
+
+        totalTimer.Stop();
+        Logger.Log($"[MAINWINDOW] ========== TOTAL MAINWINDOW CONSTRUCTOR TIME: {totalTimer.ElapsedMilliseconds}ms (LoadSequence deferred until first frame) ==========");
+    }
+
+    private void OnStartupContentRendered(object? sender, EventArgs e)
+    {
+        ContentRendered -= OnStartupContentRendered;
+
+        var stepTimer = Stopwatch.StartNew();
+        if (!_filterControlsInitialized)
         {
-            LoadSequence(initialPath);
-            Logger.Log($"[MAINWINDOW] LoadSequence: {stepTimer.ElapsedMilliseconds}ms");
+            InitializeFilterControls();
+            _filterControlsInitialized = true;
+            Logger.Log($"[MAINWINDOW] InitializeFilterControls (deferred): {stepTimer.ElapsedMilliseconds}ms");
+        }
+
+        stepTimer.Restart();
+        if (!string.IsNullOrWhiteSpace(_pendingInitialPath))
+        {
+            var path = _pendingInitialPath;
+            _pendingInitialPath = null;
+            LoadSequence(path);
+            Logger.Log($"[MAINWINDOW] LoadSequence (deferred): {stepTimer.ElapsedMilliseconds}ms");
         }
         else
         {
             ShowMessage("Press Ctrl+O to open an image.");
-            Logger.Log($"[MAINWINDOW] ShowMessage (no initial path): {stepTimer.ElapsedMilliseconds}ms");
+            Logger.Log($"[MAINWINDOW] ShowMessage (no initial path, deferred): {stepTimer.ElapsedMilliseconds}ms");
         }
-        
-        totalTimer.Stop();
-        Logger.Log($"[MAINWINDOW] ========== TOTAL MAINWINDOW CONSTRUCTOR TIME: {totalTimer.ElapsedMilliseconds}ms ==========");
     }
 
     private void ApplyConfig()
@@ -219,14 +241,16 @@ public partial class MainWindow : Window
             Logger.Log($"[DISPLAYCURRENT] UpdateWindowTitle: {stepTimer.ElapsedMilliseconds}ms");
             
             stepTimer.Restart();
-            _cache.PreloadAround(index);
-            Logger.Log($"[DISPLAYCURRENT] PreloadAround (fire and forget): {stepTimer.ElapsedMilliseconds}ms");
+            SchedulePreloadAround(index, defer: isInitialLoad);
+            Logger.Log($"[DISPLAYCURRENT] PreloadAround scheduled (defer={isInitialLoad}): {stepTimer.ElapsedMilliseconds}ms");
             
             totalTimer.Stop();
             Logger.Log($"[DISPLAYCURRENT] ========== TOTAL DISPLAYCURRENT TIME (CACHED): {totalTimer.ElapsedMilliseconds}ms ==========");
             
             if (isInitialLoad)
             {
+                StartupTimeline.Mark("First image displayed (cache hit)");
+                Logger.Log($"[STARTUP] TIME TO FIRST IMAGE: {StartupTimeline.ElapsedMs}ms since Main");
                 ShowStatus($"Image loaded from cache in {totalTimer.ElapsedMilliseconds}ms");
             }
             return;
@@ -267,14 +291,16 @@ public partial class MainWindow : Window
             Logger.Log($"[DISPLAYCURRENT] UpdateWindowTitle: {stepTimer.ElapsedMilliseconds}ms");
             
             stepTimer.Restart();
-            _cache.PreloadAround(index);
-            Logger.Log($"[DISPLAYCURRENT] PreloadAround (fire and forget): {stepTimer.ElapsedMilliseconds}ms");
+            SchedulePreloadAround(index, defer: isInitialLoad);
+            Logger.Log($"[DISPLAYCURRENT] PreloadAround scheduled (defer={isInitialLoad}): {stepTimer.ElapsedMilliseconds}ms");
             
             totalTimer.Stop();
             Logger.Log($"[DISPLAYCURRENT] ========== TOTAL DISPLAYCURRENT TIME (LOADED): {totalTimer.ElapsedMilliseconds}ms ==========");
             
             if (isInitialLoad)
             {
+                StartupTimeline.Mark("First image displayed");
+                Logger.Log($"[STARTUP] TIME TO FIRST IMAGE: {StartupTimeline.ElapsedMs}ms since Main");
                 ShowStatus($"Image loaded in {totalTimer.ElapsedMilliseconds}ms");
             }
         }
@@ -283,6 +309,27 @@ public partial class MainWindow : Window
             Logger.LogError($"Failed to load index={index}, path='{path}'", ex);
             ShowMessage($"Failed to load image '{Path.GetFileName(path)}': {ex.Message}");
         }
+    }
+
+    private void SchedulePreloadAround(int index, bool defer)
+    {
+        if (_cache == null)
+        {
+            return;
+        }
+
+        if (!defer)
+        {
+            _cache.PreloadAround(index);
+            return;
+        }
+
+        // On cold open, let the current image finish decoding before fanning out
+        // PreloadImageCount neighbors (default 41 concurrent reads).
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            _cache?.PreloadAround(index);
+        }));
     }
 
     private void UpdateOverlay(BitmapSource bitmap, string path, int index)
@@ -1232,6 +1279,10 @@ public partial class MainWindow : Window
             Logger.Log($"[LOADSEQUENCE] UpdateContextMenu: {stepTimer.ElapsedMilliseconds}ms");
             
             stepTimer.Restart();
+            StartFolderWatcher(_sequence.DirectoryPath!);
+            Logger.Log($"[LOADSEQUENCE] StartFolderWatcher: {stepTimer.ElapsedMilliseconds}ms");
+
+            stepTimer.Restart();
             _ = DisplayCurrentAsync();
             Logger.Log($"[LOADSEQUENCE] DisplayCurrentAsync (fire and forget): {stepTimer.ElapsedMilliseconds}ms");
             
@@ -1252,11 +1303,135 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);
+        StopFolderWatcher();
         _directoryGuard?.SetRequestHandler(null);
         _directoryGuard?.Dispose();
         _directoryGuard = null;
     _statusTimer.Tick -= OnStatusTimerTick;
     _statusTimer.Stop();
+    }
+
+    private void StartFolderWatcher(string directory)
+    {
+        StopFolderWatcher();
+
+        try
+        {
+            _folderWatcher = new FileSystemWatcher(directory)
+            {
+                NotifyFilter = NotifyFilters.FileName,
+                IncludeSubdirectories = false,
+                EnableRaisingEvents = true
+            };
+            _folderWatcher.Created += OnFolderChanged;
+            _folderWatcher.Deleted += OnFolderChanged;
+            _folderWatcher.Renamed += OnFolderChanged;
+            Logger.Log($"[FOLDERWATCH] Watching '{directory}'");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Failed to watch folder '{directory}'", ex);
+        }
+    }
+
+    private void StopFolderWatcher()
+    {
+        _folderRescanTimer.Stop();
+
+        if (_folderWatcher == null)
+        {
+            return;
+        }
+
+        _folderWatcher.EnableRaisingEvents = false;
+        _folderWatcher.Created -= OnFolderChanged;
+        _folderWatcher.Deleted -= OnFolderChanged;
+        _folderWatcher.Renamed -= OnFolderChanged;
+        _folderWatcher.Dispose();
+        _folderWatcher = null;
+    }
+
+    private void OnFolderChanged(object sender, FileSystemEventArgs e)
+    {
+        if (!IsSupportedImagePath(e.FullPath))
+        {
+            return;
+        }
+
+        ScheduleFolderRescan();
+    }
+
+    private static bool IsSupportedImagePath(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".jpe", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".jfif", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".png", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".dib", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".gif", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".tiff", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".tif", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".webp", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".svg", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ScheduleFolderRescan()
+    {
+        _folderRescanTimer.Stop();
+        _folderRescanTimer.Start();
+    }
+
+    private void OnFolderRescanTick(object? sender, EventArgs e)
+    {
+        _folderRescanTimer.Stop();
+
+        if (!_sequence.RefreshFromDirectory(out var addedCount, out _))
+        {
+            return;
+        }
+
+        ApplyFolderRefresh(addedCount);
+    }
+
+    private void ApplyFolderRefresh(int addedCount)
+    {
+        var currentPath = _sequence.HasImages ? _sequence.CurrentPath : null;
+        _cache = new ImageCache(_sequence, _config);
+        UpdateContextMenu();
+        UpdateWindowTitle();
+
+        if (_sequence.Count == 0)
+        {
+            _currentBitmap = null;
+            ImageDisplay.Source = null;
+            OverlayTitle.Text = string.Empty;
+            OverlayDetails.Text = string.Empty;
+            OverlaySort.Text = string.Empty;
+            SetOverlayVisibility(false, animate: false);
+            _fitScale = MinZoom;
+            SetZoom(_fitScale);
+            ShowMessage("No images remain.");
+            return;
+        }
+
+        if (currentPath != null
+            && _currentBitmap != null
+            && string.Equals(_sequence.CurrentPath, currentPath, StringComparison.OrdinalIgnoreCase))
+        {
+            UpdateOverlay(_currentBitmap, currentPath, _sequence.CurrentIndex);
+            SchedulePreloadAround(_sequence.CurrentIndex, defer: false);
+            if (addedCount > 0)
+            {
+                ShowStatus(addedCount == 1 ? "1 new image" : $"{addedCount} new images");
+            }
+
+            return;
+        }
+
+        _ = DisplayCurrentAsync();
     }
 
     private bool EnsureDirectoryGuard(string directory, string requestPath)
@@ -1708,6 +1883,12 @@ public partial class MainWindow : Window
 
     private void SetFilterPanelVisibility(bool visible, bool animate)
     {
+        if (visible && !_filterControlsInitialized)
+        {
+            InitializeFilterControls();
+            _filterControlsInitialized = true;
+        }
+
         _filterPanelVisible = visible;
         FilterPanel.BeginAnimation(UIElement.OpacityProperty, null);
 

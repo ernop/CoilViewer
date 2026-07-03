@@ -7,8 +7,8 @@ internal static class Logger
 {
     private static readonly object Sync = new();
     private static readonly string RootDirectory = ResolveRootDirectory();
-    private static readonly string LaunchLogPath = Path.Combine(RootDirectory, "coilviewer-launch.log");
-    private static readonly string ErrorLogPath = Path.Combine(RootDirectory, "coilviewer-errors.log");
+    private static readonly string LaunchLogPath = Path.Combine(RootDirectory, "CoilViewer-launch.log");
+    private static readonly string ErrorLogPath = Path.Combine(RootDirectory, "CoilViewer-errors.log");
 
     // Log rotation: when a log file exceeds this size it is renamed to .old and a
     // fresh file is started.  This prevents multi-megabyte log files from accumulating.

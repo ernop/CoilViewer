@@ -18,7 +18,7 @@ public sealed class ViewerConfig
         try
         {
             var json = File.ReadAllText(path);
-            var config = JsonSerializer.Deserialize<ViewerConfig>(json);
+            var config = JsonSerializer.Deserialize(json, ViewerConfigJsonContext.Default.ViewerConfig);
             config ??= CreateDefault();
             config.Normalize();
             return config;
@@ -35,7 +35,7 @@ public sealed class ViewerConfig
     {
         Normalize();
         Directory.CreateDirectory(Path.GetDirectoryName(path) ?? AppContext.BaseDirectory);
-        var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(this, ViewerConfigJsonContext.Default.ViewerConfig);
         File.WriteAllText(path, json);
     }
 
@@ -74,7 +74,7 @@ public sealed class ViewerConfig
         FitMode = "Uniform",
         ScalingMode = "HighQuality",
         ShowOverlay = true,
-        LoopAround = true,
+        LoopAround = false,
         SortField = CoilViewer.SortField.FileName.ToConfigValue(),
         SortDirection = CoilViewer.SortDirection.Ascending.ToConfigValue(),
         EnableNsfwDetection = false,
@@ -107,7 +107,7 @@ public sealed class ViewerConfig
     public string FitMode { get; set; } = "Uniform";
     public string ScalingMode { get; set; } = "HighQuality";
     public bool ShowOverlay { get; set; } = true;
-    public bool LoopAround { get; set; } = true;
+    public bool LoopAround { get; set; } = false;
     public string SortField { get; set; } = CoilViewer.SortField.FileName.ToConfigValue();
     public string SortDirection { get; set; } = CoilViewer.SortDirection.Ascending.ToConfigValue();
     public bool EnableNsfwDetection { get; set; } = false;

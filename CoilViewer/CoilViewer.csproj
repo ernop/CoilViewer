@@ -63,7 +63,7 @@
       <GeneratedVersionFileLines Include="    {" />
       <GeneratedVersionFileLines Include="        public const int Counter = $(NewBuildCounter)%3B" />
       <GeneratedVersionFileLines Include="        public const string VersionString = &quot;$(BuildVersionString)&quot;%3B" />
-      <GeneratedVersionFileLines Include="        public const string WindowTitle = &quot;coilviewer $(BuildVersionString)&quot;%3B" />
+      <GeneratedVersionFileLines Include="        public const string WindowTitle = &quot;CoilViewer $(BuildVersionString)&quot;%3B" />
       <GeneratedVersionFileLines Include="    }" />
       <GeneratedVersionFileLines Include="}" />
     </ItemGroup>

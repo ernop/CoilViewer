@@ -27,7 +27,7 @@ foreach ($image in $testImages) {
     Write-Host "[$testNumber/$($testImages.Count)] Testing: $fileName ($sizeMB MB)" -ForegroundColor Yellow
     
     # Clear the log
-    Clear-Content -Path "coilviewer-launch.log" -ErrorAction SilentlyContinue
+    Clear-Content -Path "CoilViewer-launch.log" -ErrorAction SilentlyContinue
     
     # Run CoilViewer
     $process = Start-Process -FilePath "CoilViewer\bin\Debug\net8.0-windows\CoilViewer.exe" -ArgumentList "`"$($image.FullName)`"" -PassThru
@@ -42,7 +42,7 @@ foreach ($image in $testImages) {
     Start-Sleep -Milliseconds 500
     
     # Extract timing data from log
-    $logContent = Get-Content "coilviewer-launch.log" -ErrorAction SilentlyContinue
+    $logContent = Get-Content "CoilViewer-launch.log" -ErrorAction SilentlyContinue
     
     if ($logContent) {
         # Extract key timings

@@ -33,6 +33,86 @@ internal sealed class ImageSequence
 
     public SortDirection SortDirection { get; private set; } = SortDirection.Ascending;
 
+    private IEnumerable<FileInfo> EnumerateSortedFiles(DirectoryInfo directory)
+    {
+        var files = directory
+            .EnumerateFiles()
+            .Where(f => IsSupportedExtension(f.Extension));
+
+        return SortField switch
+        {
+            SortField.CreationTime => SortDirection == SortDirection.Ascending
+                ? files.OrderBy(f => f.CreationTimeUtc)
+                : files.OrderByDescending(f => f.CreationTimeUtc),
+            SortField.LastWriteTime => SortDirection == SortDirection.Ascending
+                ? files.OrderBy(f => f.LastWriteTimeUtc)
+                : files.OrderByDescending(f => f.LastWriteTimeUtc),
+            SortField.FileSize => SortDirection == SortDirection.Ascending
+                ? files.OrderBy(f => f.Length)
+                : files.OrderByDescending(f => f.Length),
+            _ => SortDirection == SortDirection.Ascending
+                ? files.OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
+                : files.OrderByDescending(f => f.Name, StringComparer.OrdinalIgnoreCase)
+        };
+    }
+
+    /// <summary>
+    /// Re-scan the open folder for added/removed images without disturbing the
+    /// current image when possible. Returns true when the list changed.
+    /// </summary>
+    public bool RefreshFromDirectory(out int addedCount, out int removedCount)
+    {
+        addedCount = 0;
+        removedCount = 0;
+
+        if (string.IsNullOrEmpty(DirectoryPath))
+        {
+            return false;
+        }
+
+        var directory = new DirectoryInfo(DirectoryPath);
+        if (!directory.Exists)
+        {
+            return false;
+        }
+
+        var currentPath = HasImages ? CurrentPath : null;
+        var previous = new HashSet<string>(_images, StringComparer.OrdinalIgnoreCase);
+        var refreshed = EnumerateSortedFiles(directory).Select(f => f.FullName).ToList();
+
+        addedCount = refreshed.Count(path => !previous.Contains(path));
+        removedCount = previous.Count(path => !refreshed.Contains(path, StringComparer.OrdinalIgnoreCase));
+        if (addedCount == 0 && removedCount == 0)
+        {
+            return false;
+        }
+
+        _images.Clear();
+        _images.AddRange(refreshed);
+        _allImages.Clear();
+        _allImages.AddRange(refreshed);
+
+        if (_images.Count == 0)
+        {
+            CurrentIndex = 0;
+            return true;
+        }
+
+        if (!string.IsNullOrEmpty(currentPath))
+        {
+            var newIndex = _images.FindIndex(p => string.Equals(p, currentPath, StringComparison.OrdinalIgnoreCase));
+            CurrentIndex = newIndex >= 0 ? newIndex : Math.Min(CurrentIndex, _images.Count - 1);
+        }
+        else if (CurrentIndex >= _images.Count)
+        {
+            CurrentIndex = _images.Count - 1;
+        }
+
+        Logger.Log(
+            $"[IMAGESEQUENCE] RefreshFromDirectory added={addedCount} removed={removedCount} total={_images.Count}");
+        return true;
+    }
+
     public void LoadFromPath(string path, SortField sortField, SortDirection sortDirection, string? preferredImage = null)
     {
         var totalTimer = Stopwatch.StartNew();
@@ -55,28 +135,9 @@ internal sealed class ImageSequence
         SortDirection = sortDirection;
 
         _images.Clear();
-        var files = directory
-            .EnumerateFiles()
-            .Where(f => IsSupportedExtension(f.Extension));
-        Logger.Log($"[IMAGESEQUENCE] EnumerateFiles and filter: {stepTimer.ElapsedMilliseconds}ms");
-
         stepTimer.Restart();
-        files = SortField switch
-        {
-            SortField.CreationTime => SortDirection == SortDirection.Ascending
-                ? files.OrderBy(f => f.CreationTimeUtc)
-                : files.OrderByDescending(f => f.CreationTimeUtc),
-            SortField.LastWriteTime => SortDirection == SortDirection.Ascending
-                ? files.OrderBy(f => f.LastWriteTimeUtc)
-                : files.OrderByDescending(f => f.LastWriteTimeUtc),
-            SortField.FileSize => SortDirection == SortDirection.Ascending
-                ? files.OrderBy(f => f.Length)
-                : files.OrderByDescending(f => f.Length),
-            _ => SortDirection == SortDirection.Ascending
-                ? files.OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
-                : files.OrderByDescending(f => f.Name, StringComparer.OrdinalIgnoreCase)
-        };
-        Logger.Log($"[IMAGESEQUENCE] Apply sort ordering: {stepTimer.ElapsedMilliseconds}ms");
+        var files = EnumerateSortedFiles(directory);
+        Logger.Log($"[IMAGESEQUENCE] EnumerateFiles, filter, and sort: {stepTimer.ElapsedMilliseconds}ms");
 
         stepTimer.Restart();
         _images.AddRange(files.Select(f => f.FullName));

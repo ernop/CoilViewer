@@ -22,6 +22,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        StartupTimeline.Mark("App.OnStartup entered");
         var totalTimer = Stopwatch.StartNew();
         var stepTimer = Stopwatch.StartNew();
 
@@ -61,7 +62,7 @@ public partial class App : System.Windows.Application
         string? resolvedInitialPath = null;
         if (!string.IsNullOrWhiteSpace(initialPathInput))
         {
-            resolvedInitialPath = ResolvePath(initialPathInput);
+            resolvedInitialPath = LaunchPathResolver.Resolve(initialPathInput);
             Logger.LogPathProbe(initialPathInput, resolvedInitialPath);
         }
         Logger.Log($"[STARTUP] Path resolution: {stepTimer.ElapsedMilliseconds}ms");
@@ -90,6 +91,14 @@ public partial class App : System.Windows.Application
             stepTimer.Restart();
             window.Show();
             Logger.Log($"[STARTUP] window.Show(): {stepTimer.ElapsedMilliseconds}ms");
+            StartupTimeline.Mark("Window shown");
+            Logger.Log($"[STARTUP] TIME TO WINDOW VISIBLE: {StartupTimeline.ElapsedMs}ms since Main");
+
+            window.ContentRendered += (_, _) =>
+            {
+                StartupTimeline.Mark("First content rendered");
+                Logger.Log($"[STARTUP] TIME TO FIRST FRAME: {StartupTimeline.ElapsedMs}ms since Main");
+            };
             
             stepTimer.Restart();
             window.Activate();
@@ -106,7 +115,8 @@ public partial class App : System.Windows.Application
             Logger.Log($"[STARTUP] Window activation and focus: {stepTimer.ElapsedMilliseconds}ms");
             
             totalTimer.Stop();
-            Logger.Log($"[STARTUP] ========== TOTAL APP STARTUP TIME: {totalTimer.ElapsedMilliseconds}ms ==========");
+            Logger.Log($"[STARTUP] ========== TOTAL APP STARTUP TIME: {totalTimer.ElapsedMilliseconds}ms (timeline {StartupTimeline.ElapsedMs}ms since Main) ==========");
+            Logger.Log("[STARTUP] Note: TIME TO FIRST IMAGE is logged separately when DisplayCurrentAsync completes.");
         }
         catch (Exception ex)
         {
@@ -160,29 +170,6 @@ public partial class App : System.Windows.Application
                 Logger.LogError("Failed to initialize object detection service", ex);
             }
         });
-    }
-
-    private static string? ResolvePath(string input)
-    {
-        try
-        {
-            if (File.Exists(input) || Directory.Exists(input))
-            {
-                return Path.GetFullPath(input);
-            }
-
-            var expanded = Environment.ExpandEnvironmentVariables(input ?? string.Empty);
-            if (File.Exists(expanded) || Directory.Exists(expanded))
-            {
-                return Path.GetFullPath(expanded);
-            }
-        }
-        catch
-        {
-            // ignore resolution errors
-        }
-
-        return null;
     }
 
     private static void LogRuntimeEnvironmentInfo()

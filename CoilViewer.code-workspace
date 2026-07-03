@@ -5,6 +5,6 @@
 		}
 	],
 	"settings": {
-		"window.title": "coilViewer - ${activeEditorShort}${separator}${rootName}"
+		"window.title": "CoilViewer - ${activeEditorShort}${separator}${rootName}"
 	}
 }

@@ -6,7 +6,7 @@ I've added comprehensive timing measurements to **every step** of the CoilViewer
 
 ## How to View Timing Data
 
-All timing information is logged to `coilviewer-launch.log` in the project root directory. Each timing entry is tagged with a category prefix:
+All timing information is logged to `CoilViewer-launch.log` in the project root directory. Each timing entry is tagged with a category prefix:
 
 - `[STARTUP]` - Application initialization (App.xaml.cs)
 - `[MAINWINDOW]` - MainWindow constructor and initialization
@@ -93,7 +93,7 @@ This measures two different paths:
 
 ## Viewing the Results
 
-After running CoilViewer, open `coilviewer-launch.log` and look for the timing entries. Example output:
+After running CoilViewer, open `CoilViewer-launch.log` and look for the timing entries. Example output:
 
 ```
 [STARTUP] base.OnStartup: 2ms

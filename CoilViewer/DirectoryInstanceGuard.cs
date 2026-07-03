@@ -66,8 +66,43 @@ internal sealed class DirectoryInstanceGuard : IDisposable
         }
     }
 
+    /// <summary>
+    /// If another CoilViewer already owns this directory, signal it and return
+    /// true so the caller can exit without starting WPF. Used from Program.Main
+    /// before Application.Run to make duplicate launches near-instant.
+    /// </summary>
+    public static bool TryRedirectToExistingInstance(string directory, string? requestedPath)
+    {
+        var checkTimer = System.Diagnostics.Stopwatch.StartNew();
+        if (!IsDirectoryAlreadyOpen(directory))
+        {
+            Logger.Log($"[STARTUP] Early redirect: no existing instance for '{directory}' ({checkTimer.ElapsedMilliseconds}ms)");
+            return false;
+        }
+
+        Logger.Log($"[STARTUP] Early redirect: existing instance found for '{directory}' ({checkTimer.ElapsedMilliseconds}ms), signalling...");
+        var signalTimer = System.Diagnostics.Stopwatch.StartNew();
+        var ok = SignalExisting(directory, requestedPath);
+        Logger.Log($"[STARTUP] Early redirect signal result={ok} ({signalTimer.ElapsedMilliseconds}ms)");
+        return ok;
+    }
+
+    private static bool IsDirectoryAlreadyOpen(string directory)
+    {
+        try
+        {
+            using var mutex = Mutex.OpenExisting(BuildMutexName(directory));
+            return true;
+        }
+        catch (WaitHandleCannotBeOpenedException)
+        {
+            return false;
+        }
+    }
+
     public static bool SignalExisting(string directory, string? requestedPath)
     {
+        var totalTimer = System.Diagnostics.Stopwatch.StartNew();
         var requestSent = SendOpenRequest(directory, requestedPath);
         var signalled = false;
 
@@ -87,17 +122,20 @@ internal sealed class DirectoryInstanceGuard : IDisposable
             Logger.LogError($"Failed to signal existing instance for '{directory}'.", ex);
         }
 
-        return requestSent || signalled;
+        var ok = requestSent || signalled;
+        Logger.Log($"[STARTUP] SignalExisting total={totalTimer.ElapsedMilliseconds}ms requestSent={requestSent} signalled={signalled} ok={ok}");
+        return ok;
     }
 
     private static bool SendOpenRequest(string directory, string? requestedPath)
     {
         var pipeName = BuildPipeName(directory);
+        var connectTimer = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
             using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
-            client.Connect(2000);
+            client.Connect(500);
 
             using (var writer = new StreamWriter(client, Encoding.UTF8, bufferSize: 1024, leaveOpen: true))
             {
@@ -106,16 +144,17 @@ internal sealed class DirectoryInstanceGuard : IDisposable
             }
 
             client.WaitForPipeDrain();
+            Logger.Log($"[STARTUP] Named pipe open request sent in {connectTimer.ElapsedMilliseconds}ms for '{directory}'.");
             return true;
         }
         catch (TimeoutException)
         {
-            Logger.Log($"Timed out sending open request for '{directory}' with target '{requestedPath}'.");
+            Logger.Log($"Timed out sending open request for '{directory}' with target '{requestedPath}' after {connectTimer.ElapsedMilliseconds}ms.");
             return false;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to send open request for '{directory}' with target '{requestedPath}'.", ex);
+            Logger.LogError($"Failed to send open request for '{directory}' with target '{requestedPath}' after {connectTimer.ElapsedMilliseconds}ms.", ex);
             return false;
         }
     }
