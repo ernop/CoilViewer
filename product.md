@@ -14,7 +14,7 @@
 - Ctrl+R reloads the JSON config without restarting; menu changes save back to the same file.
 - The config file controls preload radius, cache size, background color, fit/scaling mode, overlay visibility, loop behavior, and default sort.
 - The program preloads neighboring images so navigation remains instant.
-- The "I" key toggles the metadata overlay with a gentle fade.
+- The "I" key toggles the metadata overlay with a gentle fade. For the first five seconds after open (or after re-enabling the overlay), the overlay appends "Hit I to toggle".
 - "/" or "?" toggles a keyboard shortcut list that can be dismissed quickly.
 - "=" (or Shift+=) zooms in, "-" zooms out, and zoom resets when a new image loads.
 - "\" resets zoom to the fitted scale without disturbing navigation.

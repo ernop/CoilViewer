@@ -79,7 +79,10 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _statusTimer;
     private FileSystemWatcher? _folderWatcher;
     private readonly DispatcherTimer _folderRescanTimer;
+    private readonly DispatcherTimer _overlayHintTimer;
+    private DateTime _overlayHintUntilUtc = DateTime.MinValue;
     private static readonly TimeSpan StatusDisplayDuration = TimeSpan.FromSeconds(2.5);
+    private static readonly TimeSpan OverlayHintDuration = TimeSpan.FromSeconds(5);
     private const int MaxArchiveHistorySize = 200;
     private const string QuadraticHintTag = "QuadraticHint";
     private bool _isQuadraticHintVisible;
@@ -104,6 +107,8 @@ public partial class MainWindow : Window
         _statusTimer.Tick += OnStatusTimerTick;
         _folderRescanTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         _folderRescanTimer.Tick += OnFolderRescanTick;
+        _overlayHintTimer = new DispatcherTimer { Interval = OverlayHintDuration };
+        _overlayHintTimer.Tick += OnOverlayHintTimerTick;
         Logger.Log($"[MAINWINDOW] Field initialization: {stepTimer.ElapsedMilliseconds}ms");
 
         stepTimer.Restart();
@@ -252,6 +257,7 @@ public partial class MainWindow : Window
                 StartupTimeline.Mark("First image displayed (cache hit)");
                 Logger.Log($"[STARTUP] TIME TO FIRST IMAGE: {StartupTimeline.ElapsedMs}ms since Main");
                 ShowStatus($"Image loaded from cache in {totalTimer.ElapsedMilliseconds}ms");
+                ScheduleOverlayHint();
             }
             return;
         }
@@ -302,6 +308,7 @@ public partial class MainWindow : Window
                 StartupTimeline.Mark("First image displayed");
                 Logger.Log($"[STARTUP] TIME TO FIRST IMAGE: {StartupTimeline.ElapsedMs}ms since Main");
                 ShowStatus($"Image loaded in {totalTimer.ElapsedMilliseconds}ms");
+                ScheduleOverlayHint();
             }
         }
         catch (Exception ex)
@@ -367,6 +374,10 @@ public partial class MainWindow : Window
             $"{position}/{_sequence.Count}"
         };
         OverlayTitle.Text = string.Join(" • ", overlayMeta);
+        if (_config.ShowOverlay && DateTime.UtcNow < _overlayHintUntilUtc)
+        {
+            OverlayTitle.Text += " • Hit I to toggle";
+        }
         UpdateWindowTitle();
 
         OverlaySort.Visibility = Visibility.Collapsed;
@@ -1309,6 +1320,8 @@ public partial class MainWindow : Window
         _directoryGuard = null;
     _statusTimer.Tick -= OnStatusTimerTick;
     _statusTimer.Stop();
+    _overlayHintTimer.Tick -= OnOverlayHintTimerTick;
+    _overlayHintTimer.Stop();
     }
 
     private void StartFolderWatcher(string directory)
@@ -1874,6 +1887,38 @@ public partial class MainWindow : Window
     private void ToggleOverlay()
     {
         SetOverlayVisibility(!_overlayVisible, animate: true);
+        if (_overlayVisible)
+        {
+            ScheduleOverlayHint();
+        }
+    }
+
+    private void ScheduleOverlayHint()
+    {
+        if (!_config.ShowOverlay)
+        {
+            return;
+        }
+
+        _overlayHintUntilUtc = DateTime.UtcNow.Add(OverlayHintDuration);
+        _overlayHintTimer.Stop();
+        _overlayHintTimer.Start();
+
+        if (_currentBitmap != null && _sequence.HasImages)
+        {
+            UpdateOverlay(_currentBitmap, _sequence.CurrentPath, _sequence.CurrentIndex);
+        }
+    }
+
+    private void OnOverlayHintTimerTick(object? sender, EventArgs e)
+    {
+        _overlayHintTimer.Stop();
+        _overlayHintUntilUtc = DateTime.MinValue;
+
+        if (_currentBitmap != null && _sequence.HasImages)
+        {
+            UpdateOverlay(_currentBitmap, _sequence.CurrentPath, _sequence.CurrentIndex);
+        }
     }
 
     private void ToggleFilterPanel()

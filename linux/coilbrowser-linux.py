@@ -32,7 +32,12 @@ from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
-from directory_instance_guard import DirectoryInstanceGuard, resolve_directory  # noqa: E402
+from directory_instance_guard import (  # noqa: E402
+    DirectoryInstanceGuard,
+    capture_activation_env,
+    present_window,
+    resolve_directory,
+)
 
 
 APP_NAME = "CoilViewer"
@@ -58,6 +63,7 @@ LOG_DIR = Path.home() / ".local" / "share" / "coilbrowser"
 PAN_STEP = 80.0
 FOLDER_RESCAN_DEBOUNCE_MS = 400
 MAX_ARCHIVE_HISTORY_SIZE = 200
+OVERLAY_HINT_SECONDS = 5.0
 
 # Mirrors the right-click sort options in the Windows CoilViewer build.
 SORT_FIELD_LABELS = {
@@ -220,6 +226,8 @@ class CoilBrowser(Gtk.Window):
         self._status_message: str | None = None
         self._status_seq = 0
         self._directory_guard: DirectoryInstanceGuard | None = None
+        self._overlay_hint_until = 0.0
+        self._startup_activation = capture_activation_env()
         self.show_help = False
         self.context_menu: Gtk.Menu | None = None
         self.edge_flash: str | None = None  # "start" or "end" while flashing
@@ -340,7 +348,11 @@ class CoilBrowser(Gtk.Window):
 
         guard = DirectoryInstanceGuard.try_acquire(directory)
         if guard is None:
-            DirectoryInstanceGuard.signal_existing(directory, request_path)
+            DirectoryInstanceGuard.signal_existing(
+                directory,
+                request_path,
+                capture_activation_env(),
+            )
             return False
 
         self._release_directory_guard()
@@ -356,9 +368,28 @@ class CoilBrowser(Gtk.Window):
         self._directory_guard.dispose()
         self._directory_guard = None
 
-    def _on_external_open_request(self, target_path: str | None) -> None:
+    def _on_external_open_request(
+        self,
+        target_path: str | None,
+        activation_token: str | None = None,
+        startup_id: str | None = None,
+    ) -> None:
         if target_path:
             self.load_start(Path(target_path))
+        present_window(self, activation_token, startup_id)
+
+    def _apply_launch_activation(self) -> None:
+        if not self._startup_activation:
+            return
+        startup_id = self._startup_activation.get("DESKTOP_STARTUP_ID")
+        token = self._startup_activation.get("XDG_ACTIVATION_TOKEN")
+        if startup_id or token:
+            present_window(self, token, startup_id)
+        self._startup_activation = {}
+
+    def _show_overlay_hint(self) -> None:
+        self._overlay_hint_until = time.perf_counter() + OVERLAY_HINT_SECONDS
+        self.queue_draw()
 
     def show_status(self, message: str) -> None:
         self._status_message = message
@@ -854,6 +885,8 @@ class CoilBrowser(Gtk.Window):
             self.queue_draw()
         elif key in {"i", "I"}:
             self.config.show_overlay = not self.config.show_overlay
+            if self.config.show_overlay:
+                self._show_overlay_hint()
             self.queue_draw()
         elif key in {"slash", "question"}:
             self.show_help = not self.show_help
@@ -1126,6 +1159,9 @@ class CoilBrowser(Gtk.Window):
             if not self._first_image_painted:
                 self._first_image_painted = True
                 startup_mark("first image painted")
+                if self.config.show_overlay:
+                    self._show_overlay_hint()
+                GLib.idle_add(self._apply_launch_activation)
         else:
             self.draw_text(cr, self.loading_message or "No images found", 40, 60, 28)
 
@@ -1162,6 +1198,8 @@ class CoilBrowser(Gtk.Window):
         field_label = SORT_FIELD_LABELS.get(self.config.sort_field, self.config.sort_field)
         dir_label = "ASC" if self.config.sort_direction == "ascending" else "DESC"
         parts.append(f"sort={field_label} {dir_label}")
+        if time.perf_counter() < self._overlay_hint_until:
+            parts.append("Hit I to toggle")
         text = "   ".join(parts)
         cr.set_source_rgba(0, 0, 0, 0.65)
         cr.rectangle(0, 0, width, 34)

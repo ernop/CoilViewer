@@ -31,3 +31,5 @@ CoilViewer/Generated/
 Models/*.onnx
 Models/*.txt
 !Models/.gitkeep
+__pycache__/
+*.pyc

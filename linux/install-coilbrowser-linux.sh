@@ -23,6 +23,7 @@ Type=Application
 Name=CoilViewer
 Comment=Fast keyboard-first image viewer
 Exec=$bin_dir/coilbrowser %U
+StartupWMClass=coilbrowser
 Terminal=false
 Categories=Graphics;Viewer;
 MimeType=image/png;image/jpeg;image/webp;image/gif;image/bmp;image/tiff;image/svg+xml;
