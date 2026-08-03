@@ -245,10 +245,10 @@ internal static class ZoomPanSelfTest
                                     anchor.y,
                                     start.x,
                                     start.y,
-                                    oldScrollableW,
-                                    oldScrollableH,
-                                    newScrollableW,
-                                    newScrollableH,
+                                    oldContentW,
+                                    oldContentH,
+                                    newContentW,
+                                    newContentH,
                                     oldScale,
                                     newScale,
                                     result.newOffsetX,
@@ -353,6 +353,9 @@ internal static class ZoomPanSelfTest
         return allPassed;
     }
 
+    // Oracle mirrors WPF ScrollViewer semantics: content smaller than the viewport
+    // is centered, so a viewport-space anchor must be shifted by the centering gap
+    // before scaling and shifted back by the new gap afterwards.
     private static bool AnchorPreservationIsValid(
         double viewportW,
         double viewportH,
@@ -360,21 +363,32 @@ internal static class ZoomPanSelfTest
         double anchorY,
         double oldOffsetX,
         double oldOffsetY,
-        double oldScrollableW,
-        double oldScrollableH,
-        double newScrollableW,
-        double newScrollableH,
+        double oldContentW,
+        double oldContentH,
+        double newContentW,
+        double newContentH,
         double oldScale,
         double newScale,
         double actualOffsetX,
         double actualOffsetY)
     {
+        var oldScrollableW = Math.Max(0, oldContentW - viewportW);
+        var oldScrollableH = Math.Max(0, oldContentH - viewportH);
+        var newScrollableW = Math.Max(0, newContentW - viewportW);
+        var newScrollableH = Math.Max(0, newContentH - viewportH);
+
         var clampedAnchorX = Math.Clamp(anchorX, 0, viewportW);
         var clampedAnchorY = Math.Clamp(anchorY, 0, viewportH);
         var oldClamped = ZoomPanMath.ClampScrollOffsets(oldOffsetX, oldOffsetY, oldScrollableW, oldScrollableH);
+
+        var oldGapX = Math.Max(0, (viewportW - oldContentW) * 0.5);
+        var oldGapY = Math.Max(0, (viewportH - oldContentH) * 0.5);
+        var newGapX = Math.Max(0, (viewportW - newContentW) * 0.5);
+        var newGapY = Math.Max(0, (viewportH - newContentH) * 0.5);
+
         var ratio = newScale / oldScale;
-        var rawExpectedX = (oldClamped.x + clampedAnchorX) * ratio - clampedAnchorX;
-        var rawExpectedY = (oldClamped.y + clampedAnchorY) * ratio - clampedAnchorY;
+        var rawExpectedX = (oldClamped.x + clampedAnchorX - oldGapX) * ratio - clampedAnchorX + newGapX;
+        var rawExpectedY = (oldClamped.y + clampedAnchorY - oldGapY) * ratio - clampedAnchorY + newGapY;
         var expected = ZoomPanMath.ClampScrollOffsets(rawExpectedX, rawExpectedY, newScrollableW, newScrollableH);
 
         return Math.Abs(actualOffsetX - expected.x) <= 0.01
