@@ -41,8 +41,10 @@ public partial class App : System.Windows.Application
         if (e.Args.Any(a => string.Equals(a, "--selftest", StringComparison.OrdinalIgnoreCase)))
         {
             stepTimer.Restart();
-            var ok = ZoomPanSelfTest.Run();
-            Logger.Log($"[STARTUP] ZoomPanSelfTest.Run ok={ok}: {stepTimer.ElapsedMilliseconds}ms");
+            var zoomPanOk = ZoomPanSelfTest.Run();
+            var imageSequenceOk = ImageSequenceSelfTest.Run();
+            var ok = zoomPanOk && imageSequenceOk;
+            Logger.Log($"[STARTUP] Self-tests zoomPanOk={zoomPanOk}, imageSequenceOk={imageSequenceOk}: {stepTimer.ElapsedMilliseconds}ms");
             Shutdown(ok ? 0 : 1);
             return;
         }

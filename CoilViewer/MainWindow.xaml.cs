@@ -748,8 +748,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        var previousIndex = _sequence.CurrentIndex;
+        var previousPath = _sequence.CurrentPath;
+        var sequenceRefreshed = RefreshSequenceIfAtNavigationBoundary(forward: true);
         var index = _sequence.MoveNext(_config.LoopAround);
-        if (index >= 0)
+        if (index >= 0 && ShouldDisplayAfterNavigation(previousIndex, previousPath, sequenceRefreshed))
         {
             _ = DisplayCurrentAsync();
         }
@@ -762,11 +765,72 @@ public partial class MainWindow : Window
             return;
         }
 
+        var previousIndex = _sequence.CurrentIndex;
+        var previousPath = _sequence.CurrentPath;
+        var sequenceRefreshed = RefreshSequenceIfAtNavigationBoundary(forward: false);
         var index = _sequence.MovePrevious(_config.LoopAround);
-        if (index >= 0)
+        if (index >= 0 && ShouldDisplayAfterNavigation(previousIndex, previousPath, sequenceRefreshed))
         {
             _ = DisplayCurrentAsync();
         }
+    }
+
+    private bool RefreshSequenceIfAtNavigationBoundary(bool forward)
+    {
+        if (!_sequence.HasImages)
+        {
+            return false;
+        }
+
+        var isAtBoundary = forward
+            ? _sequence.CurrentIndex + 1 >= _sequence.Count
+            : _sequence.CurrentIndex <= 0;
+        if (!isAtBoundary)
+        {
+            return false;
+        }
+
+        var nsfwFilter = Enum.TryParse<NsfwFilterMode>(_config.NsfwFilterMode, out var nsfw)
+            ? nsfw
+            : NsfwFilterMode.All;
+        var objectFilter = Enum.TryParse<ObjectFilterMode>(_config.ObjectFilterMode, out var obj)
+            ? obj
+            : ObjectFilterMode.ShowAll;
+
+        try
+        {
+            var refreshed = _sequence.RefreshFromDirectory(
+                _detectionCache,
+                nsfwFilter,
+                objectFilter,
+                _config.ObjectFilterText,
+                _config.ObjectFilterThreshold);
+            if (refreshed)
+            {
+                _cache = new ImageCache(_sequence, _config);
+                UpdateContextMenu();
+                UpdateWindowTitle();
+            }
+
+            return refreshed;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Failed to refresh image sequence at navigation boundary", ex);
+            return false;
+        }
+    }
+
+    private bool ShouldDisplayAfterNavigation(int previousIndex, string previousPath, bool sequenceRefreshed)
+    {
+        if (!_sequence.HasImages)
+        {
+            return false;
+        }
+
+        return sequenceRefreshed
+            || _sequence.CurrentIndex != previousIndex
+            || !string.Equals(_sequence.CurrentPath, previousPath, StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task MoveCurrentImageToOldAsync()
@@ -1048,7 +1112,7 @@ public partial class MainWindow : Window
             case Key.Down:
             case Key.Left:
             case Key.Up:
-                if (IsZoomed())
+                if (ZoomPanMath.GetArrowKeyAction(IsZoomed(), quadraticModifierPressed: false) == ArrowKeyAction.Pan)
                 {
                     BeginSmoothPan(e.Key);
                     e.Handled = true;
@@ -1169,33 +1233,37 @@ public partial class MainWindow : Window
 
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
-        {
-            var position = e.GetPosition(ImageScrollViewer);
-            if (e.Delta > 0)
-            {
-                ZoomIn(position);
-            }
-            else if (e.Delta < 0)
-            {
-                ZoomOut(position);
-            }
+        var action = ZoomPanMath.GetMouseWheelAction(
+            e.Delta,
+            Keyboard.Modifiers.HasFlag(ModifierKeys.Control),
+            IsZoomed());
 
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Delta > 0)
+        switch (action)
         {
-            MovePrevious();
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Delta < 0)
-        {
-            MoveNext();
-            e.Handled = true;
+            case MouseWheelAction.ZoomIn:
+                var zoomInPosition = e.GetPosition(ImageScrollViewer);
+                ZoomIn(zoomInPosition);
+                e.Handled = true;
+                return;
+            case MouseWheelAction.ZoomOut:
+                var zoomOutPosition = e.GetPosition(ImageScrollViewer);
+                ZoomOut(zoomOutPosition);
+                e.Handled = true;
+                return;
+            case MouseWheelAction.PanVertical:
+                Pan(0, -e.Delta * PanWheelFactor * GetPanSpeedMultiplier());
+                e.Handled = true;
+                return;
+            case MouseWheelAction.NavigatePrevious:
+                MovePrevious();
+                e.Handled = true;
+                return;
+            case MouseWheelAction.NavigateNext:
+                MoveNext();
+                e.Handled = true;
+                return;
+            case MouseWheelAction.None:
+                return;
         }
     }
 
@@ -2134,7 +2202,7 @@ public partial class MainWindow : Window
         SetShortcutsVisibility(!_shortcutsVisible);
     }
 
-    private bool IsZoomed() => _zoomScale > _fitScale + 0.001;
+    private bool IsZoomed() => ZoomPanMath.IsZoomed(_zoomScale, _fitScale);
 
     private void ZoomIn(Point? anchor = null)
     {
@@ -2165,8 +2233,8 @@ public partial class MainWindow : Window
 
     private void SetZoom(double scale, Point? anchor = null)
     {
-        var fit = Math.Max(_fitScale, 0.01);
-        var clamped = Math.Clamp(scale, fit, MaxZoom);
+        var fit = _fitScale;
+        var clamped = ZoomPanMath.ClampZoomScale(scale, fit, MaxZoom);
 
         Logger.Log($"SetZoom: requested={scale:F4}, fit={fit:F4}, clamped={clamped:F4}, _fitScale={_fitScale:F4}, _zoomScale={_zoomScale:F4}");
 
@@ -2275,17 +2343,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        double scaleX = viewportWidth / imageWidth;
-        double scaleY = viewportHeight / imageHeight;
-        double computed = Math.Min(1.0, Math.Min(scaleX, scaleY));
+        double computed = ZoomPanMath.ComputeFitScale(viewportWidth, viewportHeight, imageWidth, imageHeight);
 
-        if (double.IsNaN(computed) || double.IsInfinity(computed) || computed <= 0)
-        {
-            computed = MinZoom;
-        }
-
-        bool wasZoomed = _zoomScale > _fitScale + 0.001;
-        _fitScale = Math.Max(computed, 0.01);
+        bool wasZoomed = IsZoomed();
+        _fitScale = computed;
         // No separate fit transform - SetZoom handles the combined scale
 
         if (forceReset || !wasZoomed)

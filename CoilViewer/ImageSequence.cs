@@ -361,13 +361,69 @@ internal sealed class ImageSequence
         string objectFilterText,
         float objectFilterThreshold)
     {
-        // Save current path before filtering
-        string? currentPath = null;
-        if (_images.Count > 0 && CurrentIndex >= 0 && CurrentIndex < _images.Count)
+        ApplyFiltersCore(GetCurrentPathOrNull(), detectionCache, nsfwFilter, objectFilter, objectFilterText, objectFilterThreshold);
+    }
+
+    public bool RefreshFromDirectory(
+        DetectionCache detectionCache,
+        NsfwFilterMode nsfwFilter,
+        ObjectFilterMode objectFilter,
+        string objectFilterText,
+        float objectFilterThreshold)
+    {
+        if (string.IsNullOrWhiteSpace(DirectoryPath))
         {
-            currentPath = _images[CurrentIndex];
+            return false;
         }
 
+        var directory = new DirectoryInfo(DirectoryPath);
+        if (!directory.Exists)
+        {
+            return false;
+        }
+
+        var currentPath = GetCurrentPathOrNull();
+        var files = directory
+            .EnumerateFiles()
+            .Where(f => IsSupportedExtension(f.Extension));
+
+        files = SortField switch
+        {
+            SortField.CreationTime => SortDirection == SortDirection.Ascending
+                ? files.OrderBy(f => f.CreationTimeUtc)
+                : files.OrderByDescending(f => f.CreationTimeUtc),
+            SortField.LastWriteTime => SortDirection == SortDirection.Ascending
+                ? files.OrderBy(f => f.LastWriteTimeUtc)
+                : files.OrderByDescending(f => f.LastWriteTimeUtc),
+            SortField.FileSize => SortDirection == SortDirection.Ascending
+                ? files.OrderBy(f => f.Length)
+                : files.OrderByDescending(f => f.Length),
+            _ => SortDirection == SortDirection.Ascending
+                ? files.OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
+                : files.OrderByDescending(f => f.Name, StringComparer.OrdinalIgnoreCase)
+        };
+
+        var refreshedAllImages = files.Select(f => f.FullName).ToList();
+        if (PathsEqual(_allImages, refreshedAllImages))
+        {
+            return false;
+        }
+
+        _allImages.Clear();
+        _allImages.AddRange(refreshedAllImages);
+
+        ApplyFiltersCore(currentPath, detectionCache, nsfwFilter, objectFilter, objectFilterText, objectFilterThreshold);
+        return true;
+    }
+
+    private void ApplyFiltersCore(
+        string? currentPath,
+        DetectionCache detectionCache,
+        NsfwFilterMode nsfwFilter,
+        ObjectFilterMode objectFilter,
+        string objectFilterText,
+        float objectFilterThreshold)
+    {
         _images.Clear();
         
         foreach (var imagePath in _allImages)
@@ -414,14 +470,28 @@ internal sealed class ImageSequence
             }
         }
 
-        // Adjust current index if needed
+        RestoreCurrentIndex(currentPath);
+    }
+
+    private string? GetCurrentPathOrNull()
+    {
+        if (_images.Count > 0 && CurrentIndex >= 0 && CurrentIndex < _images.Count)
+        {
+            return _images[CurrentIndex];
+        }
+
+        return null;
+    }
+
+    private void RestoreCurrentIndex(string? currentPath)
+    {
         if (_images.Count == 0)
         {
             CurrentIndex = 0;
         }
         else if (currentPath != null)
         {
-            var newIndex = _images.IndexOf(currentPath);
+            var newIndex = _images.FindIndex(path => string.Equals(path, currentPath, StringComparison.OrdinalIgnoreCase));
             if (newIndex >= 0)
             {
                 CurrentIndex = newIndex;
@@ -435,6 +505,24 @@ internal sealed class ImageSequence
         {
             CurrentIndex = _images.Count - 1;
         }
+    }
+
+    private static bool PathsEqual(IReadOnlyList<string> left, IReadOnlyList<string> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Count; i++)
+        {
+            if (!string.Equals(left[i], right[i], StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public int AllImagesCount => _allImages.Count;

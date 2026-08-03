@@ -2,6 +2,23 @@ using System;
 
 namespace CoilViewer;
 
+internal enum MouseWheelAction
+{
+    None,
+    NavigatePrevious,
+    NavigateNext,
+    PanVertical,
+    ZoomIn,
+    ZoomOut
+}
+
+internal enum ArrowKeyAction
+{
+    Navigate,
+    Pan,
+    JumpHalf
+}
+
 internal static class ZoomPanMath
 {
     internal static double ComputeFitScale(double viewportW, double viewportH, double imageW, double imageH)
@@ -22,8 +39,64 @@ internal static class ZoomPanMath
         return fit;
     }
 
+    internal static double ClampZoomScale(double requestedScale, double fitScale, double maxZoom)
+    {
+        var minimum = IsPositiveFinite(fitScale) ? fitScale : 1.0;
+        var maximum = IsPositiveFinite(maxZoom) ? Math.Max(maxZoom, minimum) : minimum;
+        var requested = IsPositiveFinite(requestedScale) ? requestedScale : minimum;
+        return Math.Clamp(requested, minimum, maximum);
+    }
+
+    internal static bool IsZoomed(double zoomScale, double fitScale)
+    {
+        if (!IsPositiveFinite(zoomScale) || !IsPositiveFinite(fitScale))
+        {
+            return false;
+        }
+
+        var tolerance = Math.Max(0.000000001, Math.Abs(fitScale) * 0.001);
+        return zoomScale > fitScale + tolerance;
+    }
+
+    internal static MouseWheelAction GetMouseWheelAction(int delta, bool controlPressed, bool isZoomed)
+    {
+        if (delta == 0)
+        {
+            return MouseWheelAction.None;
+        }
+
+        if (controlPressed)
+        {
+            return delta > 0 ? MouseWheelAction.ZoomIn : MouseWheelAction.ZoomOut;
+        }
+
+        if (isZoomed)
+        {
+            return MouseWheelAction.PanVertical;
+        }
+
+        return delta > 0 ? MouseWheelAction.NavigatePrevious : MouseWheelAction.NavigateNext;
+    }
+
+    internal static ArrowKeyAction GetArrowKeyAction(bool isZoomed, bool quadraticModifierPressed)
+    {
+        if (quadraticModifierPressed)
+        {
+            return ArrowKeyAction.JumpHalf;
+        }
+
+        return isZoomed ? ArrowKeyAction.Pan : ArrowKeyAction.Navigate;
+    }
+
+    private static bool IsPositiveFinite(double value)
+    {
+        return !double.IsNaN(value) && !double.IsInfinity(value) && value > 0;
+    }
+
     internal static (double x, double y) ClampScrollOffsets(double offsetX, double offsetY, double scrollableW, double scrollableH)
     {
+        if (double.IsNaN(offsetX) || double.IsInfinity(offsetX)) offsetX = 0;
+        if (double.IsNaN(offsetY) || double.IsInfinity(offsetY)) offsetY = 0;
         if (double.IsNaN(scrollableW) || scrollableW < 0) scrollableW = 0;
         if (double.IsNaN(scrollableH) || scrollableH < 0) scrollableH = 0;
 
@@ -130,4 +203,3 @@ internal static class ZoomPanMath
         return true;
     }
 }
-

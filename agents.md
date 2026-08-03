@@ -1,8 +1,13 @@
-# CoilViewer
+# CoilViewer - Agent Entry Point
+
+Start here. Read this file and the linked documents before doing anything.
 
 High-speed fullscreen image browser focused on instant navigation through large folders on Windows with sane usability.
 
-- [Product Requirements](product.md) - Feature list and requirements tracker
+## Key Documents
+
+- [Product Requirements](product.md) â€” feature list and requirements tracker
+- [.cursorrules](.cursorrules) â€” build commands, ML model rules, config protection rules
 
 ## Supported Formats
 
